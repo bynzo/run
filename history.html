@@ -1,19 +1,16 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Running Tracker - History</title>
   <!-- Google Fonts -->
-  <link
-    href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap"
-    rel="stylesheet"
-  />
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <style>
     body {
-      font-family: "Montserrat", sans-serif;
+      font-family: 'Montserrat', sans-serif;
       margin: 0;
       padding: 0;
       background: #f7f9fc;
@@ -28,7 +25,7 @@
       background: linear-gradient(135deg, #6a11cb, #2575fc);
       color: white;
       text-align: center;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     main {
       width: 90%;
@@ -37,33 +34,49 @@
       background: white;
       border-radius: 10px;
       padding: 20px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
+
+    /* Scrollable container for the table on mobile */
+    .table-container {
+      width: 100%;
+      overflow-x: auto; /* allows horizontal scroll */
+      -webkit-overflow-scrolling: touch; /* smooth scrolling on iOS */
+      margin-bottom: 20px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+    }
+
     table {
       width: 100%;
       border-collapse: collapse;
-      margin-bottom: 20px;
+      min-width: 700px; /* forces horizontal scroll on smaller screens */
     }
-    th,
-    td {
+    th, td {
       padding: 10px;
       border-bottom: 1px solid #ddd;
       text-align: center;
+      white-space: nowrap; /* prevents wrapping of text, optional */
     }
     th {
       background-color: #f2f2f2;
       font-weight: 600;
     }
-    .button {
+
+    /* Button styles */
+    a.button, button.button {
       display: inline-block;
       padding: 8px 12px;
       background: #2575fc;
       color: white;
       border-radius: 6px;
       text-decoration: none;
+      font-weight: 600;
       transition: background 0.3s ease;
+      border: none;
+      cursor: pointer;
     }
-    .button:hover {
+    a.button:hover, button.button:hover {
       background: #1a5bcc;
     }
     a.back-link {
@@ -82,7 +95,7 @@
       background: #1a5bcc;
     }
 
-    /* Hidden container for displaying a route */
+    /* Hidden container to display a selected route */
     #routeView {
       display: none;
       margin-top: 20px;
@@ -94,20 +107,6 @@
       overflow: hidden;
       margin-bottom: 20px;
     }
-    .close-btn {
-      display: inline-block;
-      padding: 8px 12px;
-      background: #2575fc;
-      color: white;
-      border-radius: 6px;
-      text-decoration: none;
-      cursor: pointer;
-      font-weight: 600;
-      transition: background 0.3s ease;
-    }
-    .close-btn:hover {
-      background: #1a5bcc;
-    }
   </style>
 </head>
 <body>
@@ -115,76 +114,77 @@
     <h1>Past Running Exercises</h1>
   </header>
   <main>
-    <table id="exercisesTable">
-      <thead>
-        <tr>
-          <th>Date</th>
-          <th>Duration (s)</th>
-          <th>Distance (km)</th>
-          <th>Avg Speed (km/h)</th>
-          <th>Max Speed (km/h)</th>
-          <th>Min Speed (km/h)</th>
-          <th>Route</th>
-        </tr>
-      </thead>
-      <tbody>
-        <!-- Rows will be added dynamically -->
-      </tbody>
-    </table>
+    <!-- Scrollable table container -->
+    <div class="table-container">
+      <table id="exercisesTable">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Duration (s)</th>
+            <th>Distance (km)</th>
+            <th>Avg Speed (km/h)</th>
+            <th>Max Speed (km/h)</th>
+            <th>Min Speed (km/h)</th>
+            <th>Route</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Rows are generated dynamically by JS -->
+        </tbody>
+      </table>
+    </div>
+
     <a class="back-link" href="index.html">Back to Tracker</a>
 
-    <!-- Hidden container to show a selected route -->
+    <!-- Hidden container for viewing the route -->
     <div id="routeView">
       <div id="map"></div>
-      <button class="close-btn" onclick="closeRoute()">Close</button>
+      <button class="button" onclick="closeRoute()">Close</button>
     </div>
   </main>
 
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script>
-    let map; // We'll store the Leaflet map here
+    let map; // We'll store our Leaflet map here (re-initialized each time we view a route).
 
     function loadExercises() {
-      let exercises = JSON.parse(localStorage.getItem("exercises")) || [];
-      let tbody = document
-        .getElementById("exercisesTable")
-        .getElementsByTagName("tbody")[0];
+      let exercises = JSON.parse(localStorage.getItem('exercises')) || [];
+      let tbody = document.getElementById('exercisesTable').querySelector('tbody');
 
-      exercises.forEach(function (exercise, index) {
-        let row = document.createElement("tr");
+      exercises.forEach(function(exercise, index) {
+        let row = document.createElement('tr');
 
-        let dateCell = document.createElement("td");
+        let dateCell = document.createElement('td');
         dateCell.textContent = exercise.date;
         row.appendChild(dateCell);
 
-        let durationCell = document.createElement("td");
+        let durationCell = document.createElement('td');
         durationCell.textContent = exercise.duration;
         row.appendChild(durationCell);
 
-        let distanceCell = document.createElement("td");
+        let distanceCell = document.createElement('td');
         distanceCell.textContent = exercise.distance;
         row.appendChild(distanceCell);
 
-        let avgSpeedCell = document.createElement("td");
+        let avgSpeedCell = document.createElement('td');
         avgSpeedCell.textContent = exercise.avgSpeed;
         row.appendChild(avgSpeedCell);
 
-        let maxSpeedCell = document.createElement("td");
+        let maxSpeedCell = document.createElement('td');
         maxSpeedCell.textContent = exercise.maxSpeed;
         row.appendChild(maxSpeedCell);
 
-        let minSpeedCell = document.createElement("td");
+        let minSpeedCell = document.createElement('td');
         minSpeedCell.textContent = exercise.minSpeed;
         row.appendChild(minSpeedCell);
 
-        let routeCell = document.createElement("td");
-        let viewBtn = document.createElement("a");
-        viewBtn.textContent = "View Route";
-        viewBtn.href = "#";
-        viewBtn.className = "button";
-        // When clicked, we call our single-page route viewer
-        viewBtn.addEventListener("click", function () {
+        // Instead of linking to another page, we have a button that triggers viewRoute
+        let routeCell = document.createElement('td');
+        let viewBtn = document.createElement('button');
+        viewBtn.className = 'button';
+        viewBtn.textContent = 'View Route';
+        viewBtn.addEventListener('click', function() {
           viewRoute(index);
         });
         routeCell.appendChild(viewBtn);
@@ -195,48 +195,51 @@
     }
 
     function viewRoute(index) {
-      let exercises = JSON.parse(localStorage.getItem("exercises")) || [];
+      let exercises = JSON.parse(localStorage.getItem('exercises')) || [];
       let exercise = exercises[index];
-
       if (!exercise || !exercise.positions || exercise.positions.length === 0) {
         alert("No route data available for this exercise.");
         return;
       }
 
-      // Show the hidden container
-      document.getElementById("routeView").style.display = "block";
+      // Show the hidden route container
+      document.getElementById('routeView').style.display = 'block';
 
-      // Initialize (or re-initialize) the map in the #map div
-      map = L.map("map").setView([0, 0], 13);
-      L.tileLayer("https://mt1.google.com/vt/lyrs=r&x={x}&y={y}&z={z}", {
-        attribution: "© Google Maps",
-        maxZoom: 20,
+      // Create or re-init the map in the #map div
+      map = L.map('map').setView([0, 0], 13);
+      // If you want to avoid Google’s tile servers (and possible tracking issues), use OSM:
+      // L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      //   attribution: '© OpenStreetMap contributors'
+      // }).addTo(map);
+
+      // Otherwise, if you want Google-like tiles:
+      L.tileLayer('https://mt1.google.com/vt/lyrs=r&x={x}&y={y}&z={z}', {
+        attribution: '© Google Maps',
+        maxZoom: 20
       }).addTo(map);
 
       // Create a polyline from stored positions
-      let latlngs = exercise.positions.map((p) => [
-        p.coords.latitude,
-        p.coords.longitude,
-      ]);
-      let polyline = L.polyline(latlngs, { color: "red", weight: 5 }).addTo(map);
+      let latlngs = exercise.positions.map(p => [p.coords.latitude, p.coords.longitude]);
+      let polyline = L.polyline(latlngs, { color: 'red', weight: 5 }).addTo(map);
 
-      // Add start and finish markers
+      // Add markers for start and finish
       L.marker(latlngs[0]).addTo(map).bindPopup("Start");
       L.marker(latlngs[latlngs.length - 1]).addTo(map).bindPopup("Finish");
 
-      // Adjust the map view to show the entire route
+      // Fit the map view to the route
       map.fitBounds(polyline.getBounds());
     }
 
     function closeRoute() {
-      document.getElementById("routeView").style.display = "none";
-      // Optionally, if you want to remove the map instance entirely:
+      // Hide the route container
+      document.getElementById('routeView').style.display = 'none';
+      // Optionally remove the map instance
       if (map) {
         map.remove();
       }
     }
 
-    document.addEventListener("DOMContentLoaded", loadExercises);
+    document.addEventListener('DOMContentLoaded', loadExercises);
   </script>
 </body>
 </html>
