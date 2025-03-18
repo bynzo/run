@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Running Tracker</title>
+  <!-- Manifest -->
+  <link rel="manifest" href="manifest.json">
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <!-- Google Fonts -->
@@ -89,6 +91,7 @@
       text-align: center;
       font-weight: 600;
       transition: background 0.3s ease;
+      text-decoration: none;
     }
     .nav-button:hover {
       background: #1a5bcc;
@@ -121,7 +124,7 @@
     </div>
     <button id="startStopBtn">Start</button>
     <div id="map"></div>
-    <!-- Both buttons use the same nav-button style -->
+    <!-- Both navigation buttons -->
     <div style="display: flex; justify-content: space-between;">
       <a class="nav-button" href="history.html">View Past Exercises</a>
       <a class="nav-button" href="stats.html">View Statistics</a>
@@ -135,6 +138,18 @@
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script>
+    // Service Worker registration
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('service-worker.js')
+          .then(function(registration) {
+            console.log('ServiceWorker registration successful with scope: ', registration.scope);
+          }, function(err) {
+            console.log('ServiceWorker registration failed: ', err);
+          });
+      });
+    }
+
     let running = false;
     let timerInterval;
     let startTime;
