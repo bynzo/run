@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Running Tracker</title>
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Montserrat', sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f7f9fc;
+      color: #333;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    header {
+      width: 100%;
+      padding: 15px;
+      background: linear-gradient(135deg, #6a11cb, #2575fc);
+      color: white;
+      text-align: center;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    main {
+      width: 90%;
+      max-width: 600px;
+      margin: 20px 0;
+      background: white;
+      border-radius: 10px;
+      padding: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    #timer {
+      font-size: 2.5em;
+      font-weight: 600;
+      text-align: center;
+      margin-bottom: 15px;
+      animation: fadeIn 1s ease-in-out;
+    }
+    #stats p {
+      margin: 8px 0;
+      font-size: 1.1em;
+    }
+    #map {
+      width: 100%;
+      height: 250px;
+      margin: 15px 0;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    button {
+      width: 100%;
+      padding: 15px;
+      font-size: 1.2em;
+      font-weight: 600;
+      color: white;
+      background: #2575fc;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.3s ease, transform 0.2s ease;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    button:hover {
+      background: #1a5bcc;
+      transform: scale(1.02);
+    }
+    button:active {
+      transform: scale(0.98);
+    }
+    a {
+      display: block;
+      text-align: center;
+      margin-top: 20px;
+      font-size: 1em;
+      color: #2575fc;
+      text-decoration: none;
+      transition: color 0.3s ease;
+    }
+    a:hover {
+      color: #1a5bcc;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Running Tracker</h1>
+  </header>
+  <main>
+    <div id="timer">00:00:00</div>
+    <div id="stats">
+      <p>Distance: <span id="distance">0</span> km</p>
+      <p>Current Speed: <span id="currentSpeed">0</span> km/h</p>
+      <p>Average Speed: <span id="avgSpeed">0</span> km/h</p>
+      <p>Max Speed: <span id="maxSpeed">0</span> km/h</p>
+      <p>Min Speed: <span id="minSpeed">0</span> km/h</p>
+    </div>
+    <button id="startStopBtn">Start</button>
+    <div id="map"></div>
+    <a href="history.html">View Past Exercises</a>
+  </main>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script>
+    let running = false;
+    let timerInterval;
+    let startTime;
+    let elapsedTime = 0;
+    let positions = [];
+    let watchId;
+    let map, polyline;
+    let currentSpeed = 0;
+    let maxSpeed = 0;
+    let minSpeed = Infinity;
+    let totalDistance = 0;
+
+    const timerEl = document.getElementById('timer');
+    const distanceEl = document.getElementById('distance');
+    const currentSpeedEl = document.getElementById('currentSpeed');
+    const avgSpeedEl = document.getElementById('avgSpeed');
+    const maxSpeedEl = document.getElementById('maxSpeed');
+    const minSpeedEl = document.getElementById('minSpeed');
+    const btn = document.getElementById('startStopBtn');
+
+    // Initialize Leaflet map with Google Maps tiles
+    map = L.map('map').setView([0, 0], 13);
+    L.tileLayer('https://mt1.google.com/vt/lyrs=r&x={x}&y={y}&z={z}', {
+      attribution: '© Google Maps',
+      maxZoom: 20
+    }).addTo(map);
+    polyline = L.polyline([], {color: 'red', weight: 5}).addTo(map);
+
+    // On page load, center map on current position
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(function(position) {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        map.setView([lat, lng], 16);
+        L.marker([lat, lng]).addTo(map)
+          .bindPopup("You are here").openPopup();
+      }, function(error) {
+        console.warn('ERROR(' + error.code + '): ' + error.message);
+      }, { enableHighAccuracy: true });
+    } else {
+      alert("Geolocation is not supported by this browser.");
+    }
+
+    function updateTimer() {
+      elapsedTime = Math.floor((Date.now() - startTime) / 1000);
+      let hrs = String(Math.floor(elapsedTime / 3600)).padStart(2, '0');
+      let mins = String(Math.floor((elapsedTime % 3600) / 60)).padStart(2, '0');
+      let secs = String(elapsedTime % 60).padStart(2, '0');
+      timerEl.textContent = `${hrs}:${mins}:${secs}`;
+    }
+
+    // Haversine formula to compute distance (in meters) between two GPS points
+    function computeDistance(lat1, lon1, lat2, lon2) {
+      const R = 6371e3; // metres
+      const φ1 = lat1 * Math.PI/180;
+      const φ2 = lat2 * Math.PI/180;
+      const Δφ = (lat2 - lat1) * Math.PI/180;
+      const Δλ = (lon2 - lon1) * Math.PI/180;
+      const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+                Math.cos(φ1) * Math.cos(φ2) *
+                Math.sin(Δλ/2) * Math.sin(Δλ/2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    }
+
+    function startRunning() {
+      running = true;
+      startTime = Date.now();
+      elapsedTime = 0;
+      positions = [];
+      totalDistance = 0;
+      currentSpeed = 0;
+      maxSpeed = 0;
+      minSpeed = Infinity;
+      timerInterval = setInterval(updateTimer, 1000);
+      btn.textContent = "Stop";
+
+      // Clear map polyline
+      polyline.setLatLngs([]);
+      
+      // Start geolocation tracking
+      if (navigator.geolocation) {
+        watchId = navigator.geolocation.watchPosition(positionSuccess, positionError, { enableHighAccuracy: true });
+      } else {
+        alert("Geolocation is not supported by this browser.");
+      }
+    }
+
+    function stopRunning() {
+      running = false;
+      clearInterval(timerInterval);
+      if (navigator.geolocation) {
+        navigator.geolocation.clearWatch(watchId);
+      }
+      btn.textContent = "Start";
+      
+      // Prepare exercise data for saving (including all recorded positions)
+      let exercise = {
+        date: new Date(startTime).toLocaleString(),
+        duration: elapsedTime,
+        distance: (totalDistance / 1000).toFixed(2), // in km
+        avgSpeed: ((totalDistance / elapsedTime) * 3.6).toFixed(2), // km/h
+        maxSpeed: maxSpeed.toFixed(2),
+        minSpeed: (minSpeed === Infinity ? 0 : minSpeed.toFixed(2)),
+        positions: positions
+      };
+
+      // Save exercise in localStorage
+      let exercises = JSON.parse(localStorage.getItem('exercises')) || [];
+      exercises.push(exercise);
+      localStorage.setItem('exercises', JSON.stringify(exercises));
+      alert("Exercise saved!");
+
+      // Optionally, adjust map view to show the full route
+      if (positions.length > 0) {
+        let latlngs = positions.map(p => [p.coords.latitude, p.coords.longitude]);
+        map.fitBounds(latlngs);
+      }
+    }
+
+    function positionSuccess(position) {
+      // Save current position with timestamp
+      positions.push({ 
+        coords: { latitude: position.coords.latitude, longitude: position.coords.longitude },
+        timestamp: position.timestamp
+      });
+
+      let latlng = [position.coords.latitude, position.coords.longitude];
+      polyline.addLatLng(latlng);
+
+      // Update map view to the current position (live route)
+      map.setView(latlng, 16);
+
+      // Determine current speed:
+      if (position.coords.speed !== null && !isNaN(position.coords.speed)) {
+        currentSpeed = position.coords.speed; // in m/s
+      } else if (positions.length > 1) {
+        let prev = positions[positions.length - 2];
+        let d = computeDistance(prev.coords.latitude, prev.coords.longitude, position.coords.latitude, position.coords.longitude);
+        let t = (position.timestamp - prev.timestamp) / 1000;
+        currentSpeed = t > 0 ? d / t : 0;
+      } else {
+        currentSpeed = 0;
+      }
+
+      // Update total distance (if there is a previous position)
+      if (positions.length > 1) {
+        let prev = positions[positions.length - 2];
+        let d = computeDistance(prev.coords.latitude, prev.coords.longitude, position.coords.latitude, position.coords.longitude);
+        totalDistance += d;
+      }
+
+      // Update speed stats (convert from m/s to km/h for display)
+      maxSpeed = Math.max(maxSpeed, currentSpeed);
+      if (currentSpeed > 0) {
+        minSpeed = Math.min(minSpeed, currentSpeed);
+      }
+
+      distanceEl.textContent = (totalDistance / 1000).toFixed(2);
+      currentSpeedEl.textContent = (currentSpeed * 3.6).toFixed(2);
+      let avgSpeed = elapsedTime > 0 ? (totalDistance / elapsedTime) : 0;
+      avgSpeedEl.textContent = (avgSpeed * 3.6).toFixed(2);
+      maxSpeedEl.textContent = (maxSpeed * 3.6).toFixed(2);
+      minSpeedEl.textContent = (minSpeed === Infinity ? 0 : (minSpeed * 3.6).toFixed(2));
+    }
+
+    function positionError(error) {
+      console.warn('ERROR(' + error.code + '): ' + error.message);
+    }
+
+    btn.addEventListener('click', function() {
+      if (!running) {
+        startRunning();
+      } else {
+        stopRunning();
+      }
+    });
+  </script>
+</body>
+</html>
