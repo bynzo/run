@@ -75,20 +75,34 @@
       transform: scale(0.98);
     }
     a {
-      display: block;
-      text-align: center;
-      margin-top: 20px;
-      font-size: 1em;
-      color: #2575fc;
       text-decoration: none;
-      transition: color 0.3s ease;
     }
-    a:hover {
-      color: #1a5bcc;
+    /* Navigation button style applied to both buttons */
+    .nav-button {
+      display: inline-block;
+      width: calc(50% - 10px);
+      margin: 5px;
+      padding: 10px;
+      background: #2575fc;
+      color: white;
+      border-radius: 6px;
+      text-align: center;
+      font-weight: 600;
+      transition: background 0.3s ease;
+    }
+    .nav-button:hover {
+      background: #1a5bcc;
     }
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(-10px); }
       to { opacity: 1; transform: translateY(0); }
+    }
+    footer {
+      width: 100%;
+      text-align: center;
+      padding: 10px;
+      margin-bottom: 10px;
+      color: #666;
     }
   </style>
 </head>
@@ -107,8 +121,16 @@
     </div>
     <button id="startStopBtn">Start</button>
     <div id="map"></div>
-    <a href="history.html">View Past Exercises</a>
+    <!-- Both buttons use the same nav-button style -->
+    <div style="display: flex; justify-content: space-between;">
+      <a class="nav-button" href="history.html">View Past Exercises</a>
+      <a class="nav-button" href="stats.html">View Statistics</a>
+    </div>
   </main>
+
+  <footer>
+    Running Tracker 2025 v0.1
+  </footer>
 
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
@@ -209,7 +231,7 @@
       }
       btn.textContent = "Start";
       
-      // Prepare exercise data for saving (including all recorded positions)
+      // Prepare exercise data for saving
       let exercise = {
         date: new Date(startTime).toLocaleString(),
         duration: elapsedTime,
@@ -243,7 +265,7 @@
       let latlng = [position.coords.latitude, position.coords.longitude];
       polyline.addLatLng(latlng);
 
-      // Update map view to the current position (live route)
+      // Update map view to the current position
       map.setView(latlng, 16);
 
       // Determine current speed:

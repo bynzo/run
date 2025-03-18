@@ -35,70 +35,64 @@
       border-radius: 10px;
       padding: 20px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      position: relative;
     }
 
     /* Scrollable container for the table on mobile */
     .table-container {
       width: 100%;
-      overflow-x: auto; /* allows horizontal scroll */
-      -webkit-overflow-scrolling: touch; /* smooth scrolling on iOS */
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
       margin-bottom: 20px;
       border: 1px solid #ddd;
       border-radius: 8px;
     }
-
     table {
       width: 100%;
       border-collapse: collapse;
-      min-width: 700px; /* forces horizontal scroll on smaller screens */
+      min-width: 700px;
     }
     th, td {
       padding: 10px;
       border-bottom: 1px solid #ddd;
       text-align: center;
-      white-space: nowrap; /* prevents wrapping of text, optional */
+      white-space: nowrap;
     }
     th {
       background-color: #f2f2f2;
       font-weight: 600;
     }
 
-    /* Button styles */
-    a.button, button.button {
+    /* Navigation buttons */
+    .nav-button {
       display: inline-block;
-      padding: 8px 12px;
+      width: calc(50% - 10px);
+      margin: 5px;
+      padding: 10px;
       background: #2575fc;
       color: white;
       border-radius: 6px;
-      text-decoration: none;
-      font-weight: 600;
-      transition: background 0.3s ease;
-      border: none;
-      cursor: pointer;
-    }
-    a.button:hover, button.button:hover {
-      background: #1a5bcc;
-    }
-    a.back-link {
-      display: block;
       text-align: center;
-      padding: 12px;
-      background: #2575fc;
-      color: white;
-      border-radius: 8px;
-      text-decoration: none;
       font-weight: 600;
       transition: background 0.3s ease;
-      margin-top: 20px;
+      text-decoration: none;
     }
-    a.back-link:hover {
+    .nav-button:hover {
       background: #1a5bcc;
     }
 
-    /* Hidden container to display a selected route */
+    /* Single-page route viewer container */
     #routeView {
-      display: none;
-      margin-top: 20px;
+      display: none; /* Hidden by default */
+      position: absolute;
+      top: 20px;
+      left: 0;
+      right: 0;
+      background: white;
+      border-radius: 10px;
+      padding: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      z-index: 999;
     }
     #map {
       width: 100%;
@@ -106,6 +100,29 @@
       border-radius: 10px;
       overflow: hidden;
       margin-bottom: 20px;
+    }
+    .close-button {
+      display: inline-block;
+      padding: 10px 15px;
+      background: #2575fc;
+      color: white;
+      border-radius: 6px;
+      text-align: center;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+    .close-button:hover {
+      background: #1a5bcc;
+    }
+
+    footer {
+      width: 100%;
+      text-align: center;
+      padding: 10px;
+      margin-bottom: 10px;
+      color: #666;
     }
   </style>
 </head>
@@ -133,63 +150,70 @@
         </tbody>
       </table>
     </div>
+    <!-- Navigation buttons -->
+    <div style="display: flex; justify-content: space-between;">
+      <a class="nav-button" href="stats.html">View Statistics</a>
+      <a class="nav-button" href="index.html">Back to Tracker</a>
+    </div>
 
-    <a class="back-link" href="index.html">Back to Tracker</a>
-
-    <!-- Hidden container for viewing the route -->
+    <!-- Hidden single-page route viewer -->
     <div id="routeView">
       <div id="map"></div>
-      <button class="button" onclick="closeRoute()">Close</button>
+      <button class="close-button" onclick="closeRoute()">Close</button>
     </div>
   </main>
+  <footer>
+    Running Tracker 2025 v0.1
+  </footer>
 
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script>
-    let map; // We'll store our Leaflet map here (re-initialized each time we view a route).
+    let map; // We'll store our Leaflet map here.
+    let routeViewDiv = document.getElementById('routeView');
 
     function loadExercises() {
       let exercises = JSON.parse(localStorage.getItem('exercises')) || [];
       let tbody = document.getElementById('exercisesTable').querySelector('tbody');
-
       exercises.forEach(function(exercise, index) {
         let row = document.createElement('tr');
-
+        
         let dateCell = document.createElement('td');
         dateCell.textContent = exercise.date;
         row.appendChild(dateCell);
-
+        
         let durationCell = document.createElement('td');
         durationCell.textContent = exercise.duration;
         row.appendChild(durationCell);
-
+        
         let distanceCell = document.createElement('td');
         distanceCell.textContent = exercise.distance;
         row.appendChild(distanceCell);
-
+        
         let avgSpeedCell = document.createElement('td');
         avgSpeedCell.textContent = exercise.avgSpeed;
         row.appendChild(avgSpeedCell);
-
+        
         let maxSpeedCell = document.createElement('td');
         maxSpeedCell.textContent = exercise.maxSpeed;
         row.appendChild(maxSpeedCell);
-
+        
         let minSpeedCell = document.createElement('td');
         minSpeedCell.textContent = exercise.minSpeed;
         row.appendChild(minSpeedCell);
-
-        // Instead of linking to another page, we have a button that triggers viewRoute
+        
+        // "View Route" button triggers our single-page viewer
         let routeCell = document.createElement('td');
         let viewBtn = document.createElement('button');
-        viewBtn.className = 'button';
+        viewBtn.className = 'nav-button';
+        viewBtn.style.width = 'auto';  // So it doesn't stretch to 50%
         viewBtn.textContent = 'View Route';
         viewBtn.addEventListener('click', function() {
           viewRoute(index);
         });
         routeCell.appendChild(viewBtn);
         row.appendChild(routeCell);
-
+        
         tbody.appendChild(row);
       });
     }
@@ -202,38 +226,35 @@
         return;
       }
 
-      // Show the hidden route container
-      document.getElementById('routeView').style.display = 'block';
+      // Show the hidden container
+      routeViewDiv.style.display = 'block';
 
-      // Create or re-init the map in the #map div
+      // Initialize (or re-initialize) the map in #map
+      if (map) {
+        map.remove();
+      }
       map = L.map('map').setView([0, 0], 13);
-      // If you want to avoid Google’s tile servers (and possible tracking issues), use OSM:
-      // L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      //   attribution: '© OpenStreetMap contributors'
-      // }).addTo(map);
 
-      // Otherwise, if you want Google-like tiles:
+      // Use Google-like tiles or OSM (your choice)
       L.tileLayer('https://mt1.google.com/vt/lyrs=r&x={x}&y={y}&z={z}', {
         attribution: '© Google Maps',
         maxZoom: 20
       }).addTo(map);
 
-      // Create a polyline from stored positions
+      // Build the route polyline
       let latlngs = exercise.positions.map(p => [p.coords.latitude, p.coords.longitude]);
       let polyline = L.polyline(latlngs, { color: 'red', weight: 5 }).addTo(map);
 
-      // Add markers for start and finish
+      // Mark start and end
       L.marker(latlngs[0]).addTo(map).bindPopup("Start");
       L.marker(latlngs[latlngs.length - 1]).addTo(map).bindPopup("Finish");
 
-      // Fit the map view to the route
+      // Fit map bounds
       map.fitBounds(polyline.getBounds());
     }
 
     function closeRoute() {
-      // Hide the route container
-      document.getElementById('routeView').style.display = 'none';
-      // Optionally remove the map instance
+      routeViewDiv.style.display = 'none';
       if (map) {
         map.remove();
       }

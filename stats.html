@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Running Tracker - Statistics</title>
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: 'Montserrat', sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f7f9fc;
+      color: #333;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    header {
+      width: 100%;
+      padding: 15px;
+      background: linear-gradient(135deg, #6a11cb, #2575fc);
+      color: white;
+      text-align: center;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    main {
+      width: 90%;
+      max-width: 700px;
+      margin: 20px 0;
+      background: white;
+      border-radius: 10px;
+      padding: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .chart-container {
+      width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      margin-bottom: 20px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 10px;
+    }
+    canvas {
+      min-width: 600px;
+      height: 300px !important;
+    }
+    .stats-summary {
+      margin-bottom: 20px;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+    }
+    .stats-summary table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .stats-summary th, .stats-summary td {
+      padding: 8px;
+      border: 1px solid #ccc;
+      text-align: left;
+    }
+    .nav-button, button.button {
+      display: inline-block;
+      padding: 8px 12px;
+      background: #2575fc;
+      color: white;
+      border-radius: 6px;
+      text-decoration: none;
+      font-weight: 600;
+      transition: background 0.3s ease;
+      border: none;
+      cursor: pointer;
+      margin-right: 10px;
+      margin-bottom: 10px;
+    }
+    .nav-button:hover, button.button:hover {
+      background: #1a5bcc;
+    }
+    footer {
+      width: 100%;
+      text-align: center;
+      padding: 10px;
+      margin-bottom: 10px;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Exercise Statistics</h1>
+  </header>
+  <main>
+    <!-- Navigation buttons -->
+    <div style="margin-bottom: 20px;">
+      <a class="nav-button" href="index.html">Tracker</a>
+      <a class="nav-button" href="history.html">History</a>
+    </div>
+    <!-- Chart for total distance per day -->
+    <h2>Total Distance per Day</h2>
+    <div class="chart-container">
+      <canvas id="distanceBarChart"></canvas>
+    </div>
+    <!-- Chart for cumulative distance per day -->
+    <h2>Cumulative Distance per Day</h2>
+    <div class="chart-container">
+      <canvas id="cumulativeChart"></canvas>
+    </div>
+    <!-- Overall statistics summary -->
+    <h2>Overall Statistics</h2>
+    <div class="stats-summary">
+      <table>
+        <tr>
+          <th>Total Runs</th>
+          <td id="totalRuns">0</td>
+        </tr>
+        <tr>
+          <th>Total Distance (km)</th>
+          <td id="totalDistance">0</td>
+        </tr>
+        <tr>
+          <th>Total Duration (s)</th>
+          <td id="totalDuration">0</td>
+        </tr>
+        <tr>
+          <th>Average Speed (km/h)</th>
+          <td id="averageSpeed">0</td>
+        </tr>
+        <tr>
+          <th>Max Speed (km/h)</th>
+          <td id="maxSpeedOverall">0</td>
+        </tr>
+        <tr>
+          <th>Min Speed (km/h)</th>
+          <td id="minSpeedOverall">0</td>
+        </tr>
+      </table>
+    </div>
+  </main>
+  <footer>
+    Running Tracker 2025 v0.1
+  </footer>
+  <script>
+    // Retrieve stored exercises
+    const exercises = JSON.parse(localStorage.getItem('exercises')) || [];
+
+    // Utility: Format date string to YYYY-MM-DD
+    function formatDate(dateStr) {
+      const d = new Date(dateStr);
+      const year = d.getFullYear();
+      let month = (d.getMonth() + 1).toString().padStart(2, '0');
+      let day = d.getDate().toString().padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    // Group exercises by day and compute totals
+    const dailyData = {};
+    let totalRuns = exercises.length;
+    let overallTotalDistance = 0;
+    let overallTotalDuration = 0;
+    let overallMaxSpeed = 0;
+    let overallMinSpeed = Infinity;
+
+    exercises.forEach(exercise => {
+      const day = formatDate(exercise.date);
+      const distance = parseFloat(exercise.distance) || 0;
+      overallTotalDistance += distance;
+      overallTotalDuration += parseFloat(exercise.duration) || 0;
+      const maxSpeed = parseFloat(exercise.maxSpeed) || 0;
+      const minSpeed = parseFloat(exercise.minSpeed) || Infinity;
+      overallMaxSpeed = Math.max(overallMaxSpeed, maxSpeed);
+      if (minSpeed > 0 && minSpeed !== Infinity) {
+        overallMinSpeed = Math.min(overallMinSpeed, minSpeed);
+      }
+      if (!dailyData[day]) {
+        dailyData[day] = 0;
+      }
+      dailyData[day] += distance;
+    });
+
+    // Sort days and prepare chart data
+    const days = Object.keys(dailyData).sort();
+    const dailyDistances = days.map(day => dailyData[day]);
+    const cumulativeDistances = [];
+    dailyDistances.reduce((acc, cur) => {
+      const sum = acc + cur;
+      cumulativeDistances.push(sum);
+      return sum;
+    }, 0);
+
+    // Overall average speed (km/h)
+    let averageSpeed = overallTotalDuration > 0 ? (overallTotalDistance / (overallTotalDuration/3600)) : 0;
+    overallMinSpeed = (overallMinSpeed === Infinity) ? 0 : overallMinSpeed;
+
+    // Update overall statistics in the DOM
+    document.getElementById('totalRuns').textContent = totalRuns;
+    document.getElementById('totalDistance').textContent = overallTotalDistance.toFixed(2);
+    document.getElementById('totalDuration').textContent = overallTotalDuration;
+    document.getElementById('averageSpeed').textContent = averageSpeed.toFixed(2);
+    document.getElementById('maxSpeedOverall').textContent = overallMaxSpeed.toFixed(2);
+    document.getElementById('minSpeedOverall').textContent = overallMinSpeed.toFixed(2);
+
+    // Create the Total Distance per Day bar chart
+    const ctx1 = document.getElementById('distanceBarChart').getContext('2d');
+    new Chart(ctx1, {
+      type: 'bar',
+      data: {
+        labels: days,
+        datasets: [{
+          label: 'Total Distance (km)',
+          data: dailyDistances,
+          backgroundColor: 'rgba(37,117,252,0.6)',
+          borderColor: 'rgba(37,117,252,1)',
+          borderWidth: 1
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: {
+            title: {
+              display: true,
+              text: 'Day'
+            }
+          },
+          y: {
+            beginAtZero: true,
+            title: {
+              display: true,
+              text: 'Distance (km)'
+            }
+          }
+        }
+      }
+    });
+
+    // Create the Cumulative Distance per Day line chart
+    const ctx2 = document.getElementById('cumulativeChart').getContext('2d');
+    new Chart(ctx2, {
+      type: 'line',
+      data: {
+        labels: days,
+        datasets: [{
+          label: 'Cumulative Distance (km)',
+          data: cumulativeDistances,
+          backgroundColor: 'rgba(37,117,252,0.4)',
+          borderColor: 'rgba(37,117,252,1)',
+          fill: true,
+          tension: 0.1
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: {
+            title: {
+              display: true,
+              text: 'Day'
+            }
+          },
+          y: {
+            beginAtZero: true,
+            title: {
+              display: true,
+              text: 'Cumulative Distance (km)'
+            }
+          }
+        }
+      }
+    });
+  </script>
+</body>
+</html>
