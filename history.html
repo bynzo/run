@@ -142,6 +142,8 @@
             <th>Avg Speed (km/h)</th>
             <th>Max Speed (km/h)</th>
             <th>Min Speed (km/h)</th>
+            <th>Type</th>
+            <th>Weather</th>
             <th>Route</th>
           </tr>
         </thead>
@@ -163,7 +165,7 @@
     </div>
   </main>
   <footer>
-    Running Tracker 2025 v0.1
+    Running Tracker 2025 v0.2
   </footer>
 
   <!-- Leaflet JS -->
@@ -201,6 +203,20 @@
         let minSpeedCell = document.createElement('td');
         minSpeedCell.textContent = exercise.minSpeed;
         row.appendChild(minSpeedCell);
+
+        // New "Type" column
+        let typeCell = document.createElement('td');
+        typeCell.textContent = exercise.exerciseType || 'N/A';
+        row.appendChild(typeCell);
+
+        // New "Weather" column
+        let weatherCell = document.createElement('td');
+        if (exercise.weather && exercise.weather.temperature !== undefined && exercise.weather.description) {
+          weatherCell.textContent = `${exercise.weather.description}, ${exercise.weather.temperature}°C`;
+        } else {
+          weatherCell.textContent = 'N/A';
+        }
+        row.appendChild(weatherCell);
         
         // "View Route" button triggers our single-page viewer
         let routeCell = document.createElement('td');

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Running Tracker</title>
-  <!-- Manifest -->
+  <!-- Manifest (if using PWA) -->
   <link rel="manifest" href="manifest.json">
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
@@ -37,6 +37,29 @@
       border-radius: 10px;
       padding: 20px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    /* Exercise Type selection styles */
+    #exerciseTypeSelection {
+      text-align: center;
+      margin-bottom: 15px;
+    }
+    #exerciseTypeSelection p {
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+    .exercise-type {
+      font-size: 1.2em;
+      padding: 8px 12px;
+      margin: 0 5px 5px 5px;
+      border: 2px solid transparent;
+      border-radius: 6px;
+      background: #f2f2f2;
+      cursor: pointer;
+      transition: border 0.3s ease;
+    }
+    .exercise-type.selected {
+      border: 2px solid #2575fc;
+      background: #e0ebff;
     }
     #timer {
       font-size: 2.5em;
@@ -77,24 +100,16 @@
       transform: scale(0.98);
     }
     a {
-      text-decoration: none;
-    }
-    /* Navigation button style applied to both buttons */
-    .nav-button {
-      display: inline-block;
-      width: calc(50% - 10px);
-      margin: 5px;
-      padding: 10px;
-      background: #2575fc;
-      color: white;
-      border-radius: 6px;
+      display: block;
       text-align: center;
-      font-weight: 600;
-      transition: background 0.3s ease;
+      margin-top: 20px;
+      font-size: 1em;
+      color: #2575fc;
       text-decoration: none;
+      transition: color 0.3s ease;
     }
-    .nav-button:hover {
-      background: #1a5bcc;
+    a:hover {
+      color: #1a5bcc;
     }
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(-10px); }
@@ -114,6 +129,16 @@
     <h1>Running Tracker</h1>
   </header>
   <main>
+    <!-- New Exercise Type Selection -->
+    <div id="exerciseTypeSelection">
+      <p>Select Exercise Type:</p>
+      <button class="exercise-type" data-type="Run">🏃‍♂️ Run</button>
+      <button class="exercise-type" data-type="Walk">🚶‍♀️ Walk</button>
+      <button class="exercise-type" data-type="Bike">🚴‍♂️ Bike</button>
+      <button class="exercise-type" data-type="Ski">🎿 Ski</button>
+      <button class="exercise-type" data-type="Paddle Board">🏄‍♂️ Paddle Board</button>
+    </div>
+
     <div id="timer">00:00:00</div>
     <div id="stats">
       <p>Distance: <span id="distance">0</span> km</p>
@@ -124,7 +149,6 @@
     </div>
     <button id="startStopBtn">Start</button>
     <div id="map"></div>
-    <!-- Both navigation buttons -->
     <div style="display: flex; justify-content: space-between;">
       <a class="nav-button" href="history.html">View Past Exercises</a>
       <a class="nav-button" href="stats.html">View Statistics</a>
@@ -132,22 +156,58 @@
   </main>
 
   <footer>
-    Running Tracker 2025 v0.1
+    Running Tracker 2025 v0.2
   </footer>
 
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script>
-    // Service Worker registration
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', function() {
-        navigator.serviceWorker.register('service-worker.js')
-          .then(function(registration) {
-            console.log('ServiceWorker registration successful with scope: ', registration.scope);
-          }, function(err) {
-            console.log('ServiceWorker registration failed: ', err);
-          });
+    // Global variables for exercise type and weather info
+    let selectedExerciseType = null;
+    let currentWeather = null;
+
+    // Add event listeners for the exercise type buttons
+    document.querySelectorAll('.exercise-type').forEach(button => {
+      button.addEventListener('click', function() {
+        // Remove "selected" class from all buttons
+        document.querySelectorAll('.exercise-type').forEach(btn => btn.classList.remove('selected'));
+        // Add "selected" class to clicked button
+        this.classList.add('selected');
+        selectedExerciseType = this.getAttribute('data-type');
       });
+    });
+
+    // Function to fetch current weather using Open-Meteo API
+    function fetchWeather(lat, lon) {
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`;
+      fetch(url)
+        .then(response => response.json())
+        .then(data => {
+          if (data && data.current_weather) {
+            const temp = data.current_weather.temperature; // in °C
+            const weatherCode = data.current_weather.weathercode;
+            currentWeather = {
+              temperature: temp,
+              description: getWeatherDescription(weatherCode)
+            };
+            console.log("Weather info fetched:", currentWeather);
+          }
+        })
+        .catch(err => console.error("Error fetching weather:", err));
+    }
+
+    // Simple mapping from Open-Meteo weathercode to description
+    function getWeatherDescription(code) {
+      if (code === 0) return "Clear";
+      else if ([1,2,3].includes(code)) return "Partly Cloudy";
+      else if ([45,48].includes(code)) return "Fog";
+      else if ([51,53,55].includes(code)) return "Drizzle";
+      else if ([61,63,65].includes(code)) return "Rain";
+      else if ([66,67].includes(code)) return "Freezing Rain";
+      else if ([71,73,75].includes(code)) return "Snowfall";
+      else if (code === 80) return "Rain Showers";
+      else if (code === 95) return "Thunderstorm";
+      else return "Unknown";
     }
 
     let running = false;
@@ -170,25 +230,34 @@
     const minSpeedEl = document.getElementById('minSpeed');
     const btn = document.getElementById('startStopBtn');
 
-    // Initialize Leaflet map with Google Maps tiles
-    map = L.map('map').setView([0, 0], 13);
+    // Initialize Leaflet map
+    map = L.map('map').setView([0, 0], 2);  // Start at zoom=2 for a global view
     L.tileLayer('https://mt1.google.com/vt/lyrs=r&x={x}&y={y}&z={z}', {
       attribution: '© Google Maps',
       maxZoom: 20
     }).addTo(map);
-    polyline = L.polyline([], {color: 'red', weight: 5}).addTo(map);
+    polyline = L.polyline([], { color: 'red', weight: 5 }).addTo(map);
 
-    // On page load, center map on current position
+    // On page load, attempt to center map on current position
     if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(function(position) {
-        const lat = position.coords.latitude;
-        const lng = position.coords.longitude;
-        map.setView([lat, lng], 16);
-        L.marker([lat, lng]).addTo(map)
-          .bindPopup("You are here").openPopup();
-      }, function(error) {
-        console.warn('ERROR(' + error.code + '): ' + error.message);
-      }, { enableHighAccuracy: true });
+      navigator.geolocation.getCurrentPosition(
+        function(position) {
+          if (position && position.coords) {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            // Check for valid lat/lng
+            if (!isNaN(lat) && !isNaN(lng)) {
+              map.setView([lat, lng], 16);
+              L.marker([lat, lng]).addTo(map)
+                .bindPopup("You are here").openPopup();
+            }
+          }
+        },
+        function(error) {
+          console.warn('ERROR(' + error.code + '): ' + error.message);
+        },
+        { enableHighAccuracy: true }
+      );
     } else {
       alert("Geolocation is not supported by this browser.");
     }
@@ -216,6 +285,11 @@
     }
 
     function startRunning() {
+      // Ensure an exercise type is selected before starting
+      if (!selectedExerciseType) {
+        alert("Please select an exercise type before starting.");
+        return;
+      }
       running = true;
       startTime = Date.now();
       elapsedTime = 0;
@@ -227,12 +301,25 @@
       timerInterval = setInterval(updateTimer, 1000);
       btn.textContent = "Stop";
 
+      // Fetch current weather info (using current position)
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(function(position) {
+          fetchWeather(position.coords.latitude, position.coords.longitude);
+        }, function(error) {
+          console.warn("Weather fetch error:", error.message);
+        }, { enableHighAccuracy: true });
+      }
+
       // Clear map polyline
       polyline.setLatLngs([]);
       
       // Start geolocation tracking
       if (navigator.geolocation) {
-        watchId = navigator.geolocation.watchPosition(positionSuccess, positionError, { enableHighAccuracy: true });
+        watchId = navigator.geolocation.watchPosition(
+          positionSuccess, 
+          positionError, 
+          { enableHighAccuracy: true }
+        );
       } else {
         alert("Geolocation is not supported by this browser.");
       }
@@ -254,7 +341,9 @@
         avgSpeed: ((totalDistance / elapsedTime) * 3.6).toFixed(2), // km/h
         maxSpeed: maxSpeed.toFixed(2),
         minSpeed: (minSpeed === Infinity ? 0 : minSpeed.toFixed(2)),
-        positions: positions
+        positions: positions,
+        exerciseType: selectedExerciseType,
+        weather: currentWeather
       };
 
       // Save exercise in localStorage
@@ -271,24 +360,37 @@
     }
 
     function positionSuccess(position) {
+      if (!position || !position.coords) {
+        return;
+      }
+      const lat = position.coords.latitude;
+      const lng = position.coords.longitude;
+      if (isNaN(lat) || isNaN(lng)) {
+        return;
+      }
+
       // Save current position with timestamp
       positions.push({ 
-        coords: { latitude: position.coords.latitude, longitude: position.coords.longitude },
+        coords: { 
+          latitude: lat, 
+          longitude: lng,
+          altitude: position.coords.altitude // may be null
+        },
         timestamp: position.timestamp
       });
 
-      let latlng = [position.coords.latitude, position.coords.longitude];
-      polyline.addLatLng(latlng);
+      // Add the new point to the polyline
+      polyline.addLatLng([lat, lng]);
 
       // Update map view to the current position
-      map.setView(latlng, 16);
+      map.setView([lat, lng], 16);
 
-      // Determine current speed:
+      // Determine current speed
       if (position.coords.speed !== null && !isNaN(position.coords.speed)) {
         currentSpeed = position.coords.speed; // in m/s
       } else if (positions.length > 1) {
         let prev = positions[positions.length - 2];
-        let d = computeDistance(prev.coords.latitude, prev.coords.longitude, position.coords.latitude, position.coords.longitude);
+        let d = computeDistance(prev.coords.latitude, prev.coords.longitude, lat, lng);
         let t = (position.timestamp - prev.timestamp) / 1000;
         currentSpeed = t > 0 ? d / t : 0;
       } else {
@@ -298,11 +400,11 @@
       // Update total distance (if there is a previous position)
       if (positions.length > 1) {
         let prev = positions[positions.length - 2];
-        let d = computeDistance(prev.coords.latitude, prev.coords.longitude, position.coords.latitude, position.coords.longitude);
+        let d = computeDistance(prev.coords.latitude, prev.coords.longitude, lat, lng);
         totalDistance += d;
       }
 
-      // Update speed stats (convert from m/s to km/h for display)
+      // Update speed stats (convert from m/s to km/h)
       maxSpeed = Math.max(maxSpeed, currentSpeed);
       if (currentSpeed > 0) {
         minSpeed = Math.min(minSpeed, currentSpeed);
@@ -327,6 +429,18 @@
         stopRunning();
       }
     });
+    
+    // Optional: Register service worker if using PWA features
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('service-worker.js')
+          .then(function(registration) {
+            console.log('ServiceWorker registered with scope:', registration.scope);
+          }, function(err) {
+            console.error('ServiceWorker registration failed:', err);
+          });
+      });
+    }
   </script>
 </body>
 </html>
