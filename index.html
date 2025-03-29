@@ -2,13 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Running Tracker</title>
-  <!-- Manifest (if using PWA) -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Running Tracker 2025</title>
   <link rel="manifest" href="manifest.json">
-  <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-  <!-- Google Fonts -->
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
   <style>
     body {
@@ -38,15 +35,6 @@
       padding: 20px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
-    /* Exercise Type selection styles */
-    #exerciseTypeSelection {
-      text-align: center;
-      margin-bottom: 15px;
-    }
-    #exerciseTypeSelection p {
-      margin-bottom: 8px;
-      font-weight: 600;
-    }
     .exercise-type {
       font-size: 1.2em;
       padding: 8px 12px;
@@ -66,7 +54,6 @@
       font-weight: 600;
       text-align: center;
       margin-bottom: 15px;
-      animation: fadeIn 1s ease-in-out;
     }
     #stats p {
       margin: 8px 0;
@@ -77,9 +64,8 @@
       height: 250px;
       margin: 15px 0;
       border-radius: 10px;
-      overflow: hidden;
     }
-    button {
+    button, .nav-button {
       width: 100%;
       padding: 15px;
       font-size: 1.2em;
@@ -89,31 +75,14 @@
       border: none;
       border-radius: 8px;
       cursor: pointer;
-      transition: background 0.3s ease, transform 0.2s ease;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    }
-    button:hover {
-      background: #1a5bcc;
-      transform: scale(1.02);
-    }
-    button:active {
-      transform: scale(0.98);
-    }
-    a {
-      display: block;
       text-align: center;
-      margin-top: 20px;
-      font-size: 1em;
-      color: #2575fc;
+      transition: background 0.3s ease;
       text-decoration: none;
-      transition: color 0.3s ease;
+      display: inline-block;
+      margin-top: 10px;
     }
-    a:hover {
-      color: #1a5bcc;
-    }
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(-10px); }
-      to { opacity: 1; transform: translateY(0); }
+    button:hover, .nav-button:hover {
+      background: #1a5bcc;
     }
     footer {
       width: 100%;
@@ -125,11 +94,8 @@
   </style>
 </head>
 <body>
-  <header>
-    <h1>Running Tracker</h1>
-  </header>
+  <header><h1>Running Tracker</h1></header>
   <main>
-    <!-- New Exercise Type Selection -->
     <div id="exerciseTypeSelection">
       <p>Select Exercise Type:</p>
       <button class="exercise-type" data-type="Run">🏃‍♂️ Run</button>
@@ -149,67 +115,17 @@
     </div>
     <button id="startStopBtn">Start</button>
     <div id="map"></div>
-    <div style="display: flex; justify-content: space-between;">
+    <div style="display: flex; justify-content: space-between; gap: 20px;">
       <a class="nav-button" href="history.html">View Past Exercises</a>
       <a class="nav-button" href="stats.html">View Statistics</a>
     </div>
   </main>
+  <footer>Running Tracker 2025 v0.2</footer>
 
-  <footer>
-    Running Tracker 2025 v0.2
-  </footer>
-
-  <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script>
-    // Global variables for exercise type and weather info
     let selectedExerciseType = null;
     let currentWeather = null;
-
-    // Add event listeners for the exercise type buttons
-    document.querySelectorAll('.exercise-type').forEach(button => {
-      button.addEventListener('click', function() {
-        // Remove "selected" class from all buttons
-        document.querySelectorAll('.exercise-type').forEach(btn => btn.classList.remove('selected'));
-        // Add "selected" class to clicked button
-        this.classList.add('selected');
-        selectedExerciseType = this.getAttribute('data-type');
-      });
-    });
-
-    // Function to fetch current weather using Open-Meteo API
-    function fetchWeather(lat, lon) {
-      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`;
-      fetch(url)
-        .then(response => response.json())
-        .then(data => {
-          if (data && data.current_weather) {
-            const temp = data.current_weather.temperature; // in °C
-            const weatherCode = data.current_weather.weathercode;
-            currentWeather = {
-              temperature: temp,
-              description: getWeatherDescription(weatherCode)
-            };
-            console.log("Weather info fetched:", currentWeather);
-          }
-        })
-        .catch(err => console.error("Error fetching weather:", err));
-    }
-
-    // Simple mapping from Open-Meteo weathercode to description
-    function getWeatherDescription(code) {
-      if (code === 0) return "Clear";
-      else if ([1,2,3].includes(code)) return "Partly Cloudy";
-      else if ([45,48].includes(code)) return "Fog";
-      else if ([51,53,55].includes(code)) return "Drizzle";
-      else if ([61,63,65].includes(code)) return "Rain";
-      else if ([66,67].includes(code)) return "Freezing Rain";
-      else if ([71,73,75].includes(code)) return "Snowfall";
-      else if (code === 80) return "Rain Showers";
-      else if (code === 95) return "Thunderstorm";
-      else return "Unknown";
-    }
-
     let running = false;
     let timerInterval;
     let startTime;
@@ -222,44 +138,41 @@
     let minSpeed = Infinity;
     let totalDistance = 0;
 
-    const timerEl = document.getElementById('timer');
-    const distanceEl = document.getElementById('distance');
-    const currentSpeedEl = document.getElementById('currentSpeed');
-    const avgSpeedEl = document.getElementById('avgSpeed');
-    const maxSpeedEl = document.getElementById('maxSpeed');
-    const minSpeedEl = document.getElementById('minSpeed');
-    const btn = document.getElementById('startStopBtn');
+    document.querySelectorAll('.exercise-type').forEach(button => {
+      button.addEventListener('click', function () {
+        document.querySelectorAll('.exercise-type').forEach(btn => btn.classList.remove('selected'));
+        this.classList.add('selected');
+        selectedExerciseType = this.getAttribute('data-type');
+      });
+    });
 
-    // Initialize Leaflet map
-    map = L.map('map').setView([0, 0], 2);  // Start at zoom=2 for a global view
-    L.tileLayer('https://mt1.google.com/vt/lyrs=r&x={x}&y={y}&z={z}', {
-      attribution: '© Google Maps',
-      maxZoom: 20
-    }).addTo(map);
-    polyline = L.polyline([], { color: 'red', weight: 5 }).addTo(map);
-
-    // On page load, attempt to center map on current position
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        function(position) {
-          if (position && position.coords) {
-            const lat = position.coords.latitude;
-            const lng = position.coords.longitude;
-            // Check for valid lat/lng
-            if (!isNaN(lat) && !isNaN(lng)) {
-              map.setView([lat, lng], 16);
-              L.marker([lat, lng]).addTo(map)
-                .bindPopup("You are here").openPopup();
-            }
+    function fetchWeather(lat, lon) {
+      if (!lat || !lon || isNaN(lat) || isNaN(lon)) return;
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`;
+      fetch(url)
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.current_weather) {
+            currentWeather = {
+              temperature: data.current_weather.temperature,
+              description: getWeatherDescription(data.current_weather.weathercode)
+            };
           }
-        },
-        function(error) {
-          console.warn('ERROR(' + error.code + '): ' + error.message);
-        },
-        { enableHighAccuracy: true }
-      );
-    } else {
-      alert("Geolocation is not supported by this browser.");
+        })
+        .catch(err => console.error("Weather fetch error", err));
+    }
+
+    function getWeatherDescription(code) {
+      if (code === 0) return "Clear";
+      else if ([1,2,3].includes(code)) return "Partly Cloudy";
+      else if ([45,48].includes(code)) return "Fog";
+      else if ([51,53,55].includes(code)) return "Drizzle";
+      else if ([61,63,65].includes(code)) return "Rain";
+      else if ([66,67].includes(code)) return "Freezing Rain";
+      else if ([71,73,75].includes(code)) return "Snow";
+      else if (code === 80) return "Rain Showers";
+      else if (code === 95) return "Thunderstorm";
+      else return "Unknown";
     }
 
     function updateTimer() {
@@ -267,25 +180,21 @@
       let hrs = String(Math.floor(elapsedTime / 3600)).padStart(2, '0');
       let mins = String(Math.floor((elapsedTime % 3600) / 60)).padStart(2, '0');
       let secs = String(elapsedTime % 60).padStart(2, '0');
-      timerEl.textContent = `${hrs}:${mins}:${secs}`;
+      document.getElementById('timer').textContent = `${hrs}:${mins}:${secs}`;
     }
 
-    // Haversine formula to compute distance (in meters) between two GPS points
     function computeDistance(lat1, lon1, lat2, lon2) {
-      const R = 6371e3; // metres
+      const R = 6371e3;
       const φ1 = lat1 * Math.PI/180;
       const φ2 = lat2 * Math.PI/180;
       const Δφ = (lat2 - lat1) * Math.PI/180;
       const Δλ = (lon2 - lon1) * Math.PI/180;
-      const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
-                Math.cos(φ1) * Math.cos(φ2) *
-                Math.sin(Δλ/2) * Math.sin(Δλ/2);
+      const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ/2) * Math.sin(Δλ/2);
       const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
       return R * c;
     }
 
     function startRunning() {
-      // Ensure an exercise type is selected before starting
       if (!selectedExerciseType) {
         alert("Please select an exercise type before starting.");
         return;
@@ -299,46 +208,29 @@
       maxSpeed = 0;
       minSpeed = Infinity;
       timerInterval = setInterval(updateTimer, 1000);
-      btn.textContent = "Stop";
+      document.getElementById('startStopBtn').textContent = "Stop";
 
-      // Fetch current weather info (using current position)
       if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(function(position) {
-          fetchWeather(position.coords.latitude, position.coords.longitude);
-        }, function(error) {
-          console.warn("Weather fetch error:", error.message);
-        }, { enableHighAccuracy: true });
-      }
-
-      // Clear map polyline
-      polyline.setLatLngs([]);
-      
-      // Start geolocation tracking
-      if (navigator.geolocation) {
-        watchId = navigator.geolocation.watchPosition(
-          positionSuccess, 
-          positionError, 
-          { enableHighAccuracy: true }
-        );
+        navigator.geolocation.getCurrentPosition(pos => {
+          fetchWeather(pos.coords.latitude, pos.coords.longitude);
+        });
+        watchId = navigator.geolocation.watchPosition(positionSuccess, positionError, { enableHighAccuracy: true });
       } else {
-        alert("Geolocation is not supported by this browser.");
+        alert("Geolocation not supported.");
       }
     }
 
     function stopRunning() {
       running = false;
       clearInterval(timerInterval);
-      if (navigator.geolocation) {
-        navigator.geolocation.clearWatch(watchId);
-      }
-      btn.textContent = "Start";
-      
-      // Prepare exercise data for saving
-      let exercise = {
+      navigator.geolocation.clearWatch(watchId);
+      document.getElementById('startStopBtn').textContent = "Start";
+
+      const exercise = {
         date: new Date(startTime).toLocaleString(),
         duration: elapsedTime,
-        distance: (totalDistance / 1000).toFixed(2), // in km
-        avgSpeed: ((totalDistance / elapsedTime) * 3.6).toFixed(2), // km/h
+        distance: (totalDistance / 1000).toFixed(2),
+        avgSpeed: ((totalDistance / elapsedTime) * 3.6).toFixed(2),
         maxSpeed: maxSpeed.toFixed(2),
         minSpeed: (minSpeed === Infinity ? 0 : minSpeed.toFixed(2)),
         positions: positions,
@@ -346,100 +238,72 @@
         weather: currentWeather
       };
 
-      // Save exercise in localStorage
       let exercises = JSON.parse(localStorage.getItem('exercises')) || [];
       exercises.push(exercise);
       localStorage.setItem('exercises', JSON.stringify(exercises));
       alert("Exercise saved!");
-
-      // Optionally, adjust map view to show the full route
-      if (positions.length > 0) {
-        let latlngs = positions.map(p => [p.coords.latitude, p.coords.longitude]);
-        map.fitBounds(latlngs);
-      }
     }
 
     function positionSuccess(position) {
-      if (!position || !position.coords) {
-        return;
-      }
-      const lat = position.coords.latitude;
-      const lng = position.coords.longitude;
-      if (isNaN(lat) || isNaN(lng)) {
-        return;
-      }
+  const { latitude, longitude } = position.coords;
 
-      // Save current position with timestamp
-      positions.push({ 
-        coords: { 
-          latitude: lat, 
-          longitude: lng,
-          altitude: position.coords.altitude // may be null
-        },
-        timestamp: position.timestamp
-      });
+  if (!latitude || !longitude || isNaN(latitude) || isNaN(longitude)) {
+    console.warn("Invalid GPS coordinates, skipping this point.");
+    return;
+  }
 
-      // Add the new point to the polyline
-      polyline.addLatLng([lat, lng]);
+  const timestamp = position.timestamp;
+  if (positions.length > 0) {
+    const prev = positions[positions.length - 1];
+    const d = computeDistance(prev.coords.latitude, prev.coords.longitude, latitude, longitude);
+    const t = (timestamp - prev.timestamp) / 1000;
+    totalDistance += d;
+    currentSpeed = t > 0 ? d / t : 0;
+  }
 
-      // Update map view to the current position
-      map.setView([lat, lng], 16);
+  if (currentSpeed > 0) {
+    maxSpeed = Math.max(maxSpeed, currentSpeed);
+    minSpeed = Math.min(minSpeed, currentSpeed);
+  }
 
-      // Determine current speed
-      if (position.coords.speed !== null && !isNaN(position.coords.speed)) {
-        currentSpeed = position.coords.speed; // in m/s
-      } else if (positions.length > 1) {
-        let prev = positions[positions.length - 2];
-        let d = computeDistance(prev.coords.latitude, prev.coords.longitude, lat, lng);
-        let t = (position.timestamp - prev.timestamp) / 1000;
-        currentSpeed = t > 0 ? d / t : 0;
-      } else {
-        currentSpeed = 0;
-      }
+  positions.push({ coords: { latitude, longitude }, timestamp });
+  polyline.addLatLng([latitude, longitude]);
+  map.setView([latitude, longitude], 16);
 
-      // Update total distance (if there is a previous position)
-      if (positions.length > 1) {
-        let prev = positions[positions.length - 2];
-        let d = computeDistance(prev.coords.latitude, prev.coords.longitude, lat, lng);
-        totalDistance += d;
-      }
+  document.getElementById('distance').textContent = (totalDistance / 1000).toFixed(2);
+  document.getElementById('currentSpeed').textContent = (currentSpeed * 3.6).toFixed(2);
+  const avgSpeed = elapsedTime > 0 ? (totalDistance / elapsedTime) : 0;
+  document.getElementById('avgSpeed').textContent = (avgSpeed * 3.6).toFixed(2);
+  document.getElementById('maxSpeed').textContent = (maxSpeed * 3.6).toFixed(2);
+  document.getElementById('minSpeed').textContent = (minSpeed === Infinity ? 0 : (minSpeed * 3.6).toFixed(2));
+}
 
-      // Update speed stats (convert from m/s to km/h)
-      maxSpeed = Math.max(maxSpeed, currentSpeed);
-      if (currentSpeed > 0) {
-        minSpeed = Math.min(minSpeed, currentSpeed);
-      }
-
-      distanceEl.textContent = (totalDistance / 1000).toFixed(2);
-      currentSpeedEl.textContent = (currentSpeed * 3.6).toFixed(2);
-      let avgSpeed = elapsedTime > 0 ? (totalDistance / elapsedTime) : 0;
-      avgSpeedEl.textContent = (avgSpeed * 3.6).toFixed(2);
-      maxSpeedEl.textContent = (maxSpeed * 3.6).toFixed(2);
-      minSpeedEl.textContent = (minSpeed === Infinity ? 0 : (minSpeed * 3.6).toFixed(2));
-    }
 
     function positionError(error) {
-      console.warn('ERROR(' + error.code + '): ' + error.message);
+      console.warn(`ERROR(${error.code}): ${error.message}`);
     }
 
-    btn.addEventListener('click', function() {
-      if (!running) {
-        startRunning();
-      } else {
-        stopRunning();
-      }
+    document.getElementById('startStopBtn').addEventListener('click', () => {
+      running ? stopRunning() : startRunning();
     });
-    
-    // Optional: Register service worker if using PWA features
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', function() {
-        navigator.serviceWorker.register('service-worker.js')
-          .then(function(registration) {
-            console.log('ServiceWorker registered with scope:', registration.scope);
-          }, function(err) {
-            console.error('ServiceWorker registration failed:', err);
-          });
-      });
+
+    window.onload = function () {
+      map = L.map('map').setView([0, 0], 2);
+      L.tileLayer('https://mt1.google.com/vt/lyrs=r&x={x}&y={y}&z={z}', {
+        attribution: '© Google Maps',
+        maxZoom: 20
+      }).addTo(map);
+      polyline = L.polyline([], { color: 'red', weight: 5 }).addTo(map);
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(pos => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          if (!isNaN(lat) && !isNaN(lng)) {
+            map.setView([lat, lng], 16);
+            L.marker([lat, lng]).addTo(map).bindPopup("You are here").openPopup();
+          }
+        });
+      }
     }
   </script>
 </body>

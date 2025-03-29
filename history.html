@@ -1,13 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Running Tracker - History</title>
-  <!-- Google Fonts -->
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
-  <!-- Leaflet CSS -->
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Exercise History</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
   <style>
     body {
       font-family: 'Montserrat', sans-serif;
@@ -29,28 +27,23 @@
     }
     main {
       width: 90%;
-      max-width: 700px;
+      max-width: 1000px;
       margin: 20px 0;
       background: white;
       border-radius: 10px;
       padding: 20px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-      position: relative;
     }
-
-    /* Scrollable container for the table on mobile */
     .table-container {
       width: 100%;
       overflow-x: auto;
       -webkit-overflow-scrolling: touch;
       margin-bottom: 20px;
-      border: 1px solid #ddd;
-      border-radius: 8px;
     }
     table {
       width: 100%;
       border-collapse: collapse;
-      min-width: 700px;
+      min-width: 900px;
     }
     th, td {
       padding: 10px;
@@ -62,12 +55,8 @@
       background-color: #f2f2f2;
       font-weight: 600;
     }
-
-    /* Navigation buttons */
     .nav-button {
       display: inline-block;
-      width: calc(50% - 10px);
-      margin: 5px;
       padding: 10px;
       background: #2575fc;
       color: white;
@@ -76,47 +65,22 @@
       font-weight: 600;
       transition: background 0.3s ease;
       text-decoration: none;
+      border: none;
+      cursor: pointer;
     }
     .nav-button:hover {
       background: #1a5bcc;
     }
-
-    /* Single-page route viewer container */
     #routeView {
-      display: none; /* Hidden by default */
-      position: absolute;
-      top: 20px;
-      left: 0;
-      right: 0;
-      background: white;
-      border-radius: 10px;
-      padding: 20px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-      z-index: 999;
+      display: none;
+      margin-top: 20px;
     }
     #map {
       width: 100%;
       height: 300px;
       border-radius: 10px;
-      overflow: hidden;
-      margin-bottom: 20px;
+      margin-bottom: 15px;
     }
-    .close-button {
-      display: inline-block;
-      padding: 10px 15px;
-      background: #2575fc;
-      color: white;
-      border-radius: 6px;
-      text-align: center;
-      font-weight: 600;
-      border: none;
-      cursor: pointer;
-      transition: background 0.3s ease;
-    }
-    .close-button:hover {
-      background: #1a5bcc;
-    }
-
     footer {
       width: 100%;
       text-align: center;
@@ -127,11 +91,8 @@
   </style>
 </head>
 <body>
-  <header>
-    <h1>Past Running Exercises</h1>
-  </header>
+  <header><h1>Past Running Exercises</h1></header>
   <main>
-    <!-- Scrollable table container -->
     <div class="table-container">
       <table id="exercisesTable">
         <thead>
@@ -139,144 +100,85 @@
             <th>Date</th>
             <th>Duration (s)</th>
             <th>Distance (km)</th>
-            <th>Avg Speed (km/h)</th>
-            <th>Max Speed (km/h)</th>
-            <th>Min Speed (km/h)</th>
+            <th>Avg Speed</th>
+            <th>Max Speed</th>
+            <th>Min Speed</th>
             <th>Type</th>
             <th>Weather</th>
             <th>Route</th>
           </tr>
         </thead>
-        <tbody>
-          <!-- Rows are generated dynamically by JS -->
-        </tbody>
+        <tbody></tbody>
       </table>
     </div>
-    <!-- Navigation buttons -->
-    <div style="display: flex; justify-content: space-between;">
-      <a class="nav-button" href="stats.html">View Statistics</a>
+    <div style="display: flex; justify-content: space-between; gap: 20px;">
       <a class="nav-button" href="index.html">Back to Tracker</a>
+      <a class="nav-button" href="stats.html">View Statistics</a>
     </div>
-
-    <!-- Hidden single-page route viewer -->
     <div id="routeView">
       <div id="map"></div>
-      <button class="close-button" onclick="closeRoute()">Close</button>
+      <button class="nav-button" onclick="closeRoute()">Close</button>
     </div>
   </main>
-  <footer>
-    Running Tracker 2025 v0.2
-  </footer>
+  <footer>Running Tracker 2025 v0.2</footer>
 
-  <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script>
-    let map; // We'll store our Leaflet map here.
-    let routeViewDiv = document.getElementById('routeView');
+    const exercises = JSON.parse(localStorage.getItem('exercises')) || [];
+    const tableBody = document.querySelector('#exercisesTable tbody');
 
-    function loadExercises() {
-      let exercises = JSON.parse(localStorage.getItem('exercises')) || [];
-      let tbody = document.getElementById('exercisesTable').querySelector('tbody');
-      exercises.forEach(function(exercise, index) {
-        let row = document.createElement('tr');
-        
-        let dateCell = document.createElement('td');
-        dateCell.textContent = exercise.date;
-        row.appendChild(dateCell);
-        
-        let durationCell = document.createElement('td');
-        durationCell.textContent = exercise.duration;
-        row.appendChild(durationCell);
-        
-        let distanceCell = document.createElement('td');
-        distanceCell.textContent = exercise.distance;
-        row.appendChild(distanceCell);
-        
-        let avgSpeedCell = document.createElement('td');
-        avgSpeedCell.textContent = exercise.avgSpeed;
-        row.appendChild(avgSpeedCell);
-        
-        let maxSpeedCell = document.createElement('td');
-        maxSpeedCell.textContent = exercise.maxSpeed;
-        row.appendChild(maxSpeedCell);
-        
-        let minSpeedCell = document.createElement('td');
-        minSpeedCell.textContent = exercise.minSpeed;
-        row.appendChild(minSpeedCell);
+    exercises.forEach((exercise, index) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${exercise.date}</td>
+        <td>${exercise.duration}</td>
+        <td>${exercise.distance}</td>
+        <td>${exercise.avgSpeed}</td>
+        <td>${exercise.maxSpeed}</td>
+        <td>${exercise.minSpeed}</td>
+        <td>${exercise.exerciseType || 'N/A'}</td>
+        <td>${exercise.weather ? `${exercise.weather.description}, ${exercise.weather.temperature}°C` : 'N/A'}</td>
+        <td><button class="nav-button" style="padding:6px 10px; font-size: 14px;" onclick="viewRoute(${index})">View</button></td>
+      `;
+      tableBody.appendChild(tr);
+    });
 
-        // New "Type" column
-        let typeCell = document.createElement('td');
-        typeCell.textContent = exercise.exerciseType || 'N/A';
-        row.appendChild(typeCell);
-
-        // New "Weather" column
-        let weatherCell = document.createElement('td');
-        if (exercise.weather && exercise.weather.temperature !== undefined && exercise.weather.description) {
-          weatherCell.textContent = `${exercise.weather.description}, ${exercise.weather.temperature}°C`;
-        } else {
-          weatherCell.textContent = 'N/A';
-        }
-        row.appendChild(weatherCell);
-        
-        // "View Route" button triggers our single-page viewer
-        let routeCell = document.createElement('td');
-        let viewBtn = document.createElement('button');
-        viewBtn.className = 'nav-button';
-        viewBtn.style.width = 'auto';  // So it doesn't stretch to 50%
-        viewBtn.textContent = 'View Route';
-        viewBtn.addEventListener('click', function() {
-          viewRoute(index);
-        });
-        routeCell.appendChild(viewBtn);
-        row.appendChild(routeCell);
-        
-        tbody.appendChild(row);
-      });
-    }
-
+    let map;
     function viewRoute(index) {
-      let exercises = JSON.parse(localStorage.getItem('exercises')) || [];
-      let exercise = exercises[index];
+      const exercise = exercises[index];
       if (!exercise || !exercise.positions || exercise.positions.length === 0) {
         alert("No route data available for this exercise.");
         return;
       }
 
-      // Show the hidden container
+      const routeViewDiv = document.getElementById('routeView');
       routeViewDiv.style.display = 'block';
 
-      // Initialize (or re-initialize) the map in #map
-      if (map) {
-        map.remove();
+      const mapContainer = document.getElementById('map');
+      mapContainer.innerHTML = ""; // clear previous map
+      if (mapContainer._leaflet_id) {
+        mapContainer._leaflet_id = null;
       }
+
       map = L.map('map').setView([0, 0], 13);
 
-      // Use Google-like tiles or OSM (your choice)
       L.tileLayer('https://mt1.google.com/vt/lyrs=r&x={x}&y={y}&z={z}', {
         attribution: '© Google Maps',
         maxZoom: 20
       }).addTo(map);
 
-      // Build the route polyline
-      let latlngs = exercise.positions.map(p => [p.coords.latitude, p.coords.longitude]);
-      let polyline = L.polyline(latlngs, { color: 'red', weight: 5 }).addTo(map);
+      const latlngs = exercise.positions.map(p => [p.coords.latitude, p.coords.longitude]);
+      const polyline = L.polyline(latlngs, { color: 'red' }).addTo(map);
 
-      // Mark start and end
       L.marker(latlngs[0]).addTo(map).bindPopup("Start");
       L.marker(latlngs[latlngs.length - 1]).addTo(map).bindPopup("Finish");
 
-      // Fit map bounds
       map.fitBounds(polyline.getBounds());
     }
 
     function closeRoute() {
-      routeViewDiv.style.display = 'none';
-      if (map) {
-        map.remove();
-      }
+      document.getElementById('routeView').style.display = 'none';
     }
-
-    document.addEventListener('DOMContentLoaded', loadExercises);
   </script>
 </body>
 </html>

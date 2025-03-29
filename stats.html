@@ -4,11 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Running Tracker - Statistics</title>
-  <!-- Manifest -->
   <link rel="manifest" href="manifest.json">
-  <!-- Google Fonts -->
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
-  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body {
@@ -31,7 +28,7 @@
     }
     main {
       width: 90%;
-      max-width: 700px;
+      max-width: 800px;
       margin: 20px 0;
       background: white;
       border-radius: 10px;
@@ -46,6 +43,25 @@
       border: 1px solid #ddd;
       border-radius: 8px;
       padding: 10px;
+    }
+    .toggle-btns {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .toggle-btns button {
+      padding: 10px 15px;
+      background: #2575fc;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+    .toggle-btns button:hover {
+      background: #1a5bcc;
     }
     canvas {
       min-width: 600px;
@@ -97,185 +113,133 @@
     <h1>Exercise Statistics</h1>
   </header>
   <main>
-    <!-- Navigation buttons -->
     <div style="margin-bottom: 20px;">
       <a class="nav-button" href="index.html">Tracker</a>
       <a class="nav-button" href="history.html">History</a>
     </div>
-    <!-- Chart for total distance per day -->
-    <h2>Total Distance per Day</h2>
-    <div class="chart-container">
-      <canvas id="distanceBarChart"></canvas>
+
+    <h2>Exercise Duration per Day</h2>
+    <div class="toggle-btns">
+      <button onclick="renderChart('duration', 'week')">Week View</button>
+      <button onclick="renderChart('duration', 'month')">Month View</button>
     </div>
-    <!-- Chart for cumulative distance per day -->
-    <h2>Cumulative Distance per Day</h2>
     <div class="chart-container">
-      <canvas id="cumulativeChart"></canvas>
+      <canvas id="durationChart"></canvas>
     </div>
-    <!-- Overall statistics summary -->
+
+    <h2>Exercise Distance per Day</h2>
+    <div class="toggle-btns">
+      <button onclick="renderChart('distance', 'week')">Week View</button>
+      <button onclick="renderChart('distance', 'month')">Month View</button>
+    </div>
+    <div class="chart-container">
+      <canvas id="distanceChart"></canvas>
+    </div>
+
     <h2>Overall Statistics</h2>
     <div class="stats-summary">
       <table>
-        <tr>
-          <th>Total Runs</th>
-          <td id="totalRuns">0</td>
-        </tr>
-        <tr>
-          <th>Total Distance (km)</th>
-          <td id="totalDistance">0</td>
-        </tr>
-        <tr>
-          <th>Total Duration (s)</th>
-          <td id="totalDuration">0</td>
-        </tr>
-        <tr>
-          <th>Average Speed (km/h)</th>
-          <td id="averageSpeed">0</td>
-        </tr>
-        <tr>
-          <th>Max Speed (km/h)</th>
-          <td id="maxSpeedOverall">0</td>
-        </tr>
-        <tr>
-          <th>Min Speed (km/h)</th>
-          <td id="minSpeedOverall">0</td>
-        </tr>
+        <tr><th>Total Runs</th><td id="totalRuns">0</td></tr>
+        <tr><th>Total Distance (km)</th><td id="totalDistance">0</td></tr>
+        <tr><th>Total Duration (hrs)</th><td id="totalDuration">0</td></tr>
+        <tr><th>Average Speed (km/h)</th><td id="averageSpeed">0</td></tr>
+        <tr><th>Max Speed (km/h)</th><td id="maxSpeedOverall">0</td></tr>
+        <tr><th>Min Speed (km/h)</th><td id="minSpeedOverall">0</td></tr>
       </table>
     </div>
   </main>
-  <footer>
-    Running Tracker 2025 v0.1
-  </footer>
+  <footer>Running Tracker 2025 v0.2</footer>
   <script>
-    // Retrieve stored exercises
     const exercises = JSON.parse(localStorage.getItem('exercises')) || [];
+    const durationCtx = document.getElementById('durationChart').getContext('2d');
+    const distanceCtx = document.getElementById('distanceChart').getContext('2d');
+    let durationChart, distanceChart;
 
-    // Utility: Format date string to YYYY-MM-DD
-    function formatDate(dateStr) {
-      const d = new Date(dateStr);
-      const year = d.getFullYear();
-      let month = (d.getMonth() + 1).toString().padStart(2, '0');
-      let day = d.getDate().toString().padStart(2, '0');
-      return `${year}-${month}-${day}`;
+    function getPeriodKey(date, mode) {
+      let parsedDate;
+      try {
+        parsedDate = new Date(date);
+        if (isNaN(parsedDate.getTime())) throw new Error('Invalid date');
+      } catch (e) {
+        parsedDate = new Date(); // fallback to now
+      }
+      return parsedDate.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
     }
 
-    // Group exercises by day and compute totals
-    const dailyData = {};
-    let totalRuns = exercises.length;
-    let overallTotalDistance = 0;
-    let overallTotalDuration = 0;
-    let overallMaxSpeed = 0;
-    let overallMinSpeed = Infinity;
+    function groupData(mode, type) {
+      const data = {};
+      exercises.forEach(ex => {
+        const key = getPeriodKey(ex.date, mode);
+        if (!key) return;
+        if (!data[key]) data[key] = {};
+        const exType = ex.exerciseType || 'Unknown';
+        if (!data[key][exType]) data[key][exType] = 0;
+        if (type === 'duration') {
+          data[key][exType] += (parseFloat(ex.duration) || 0) / 3600;
+        } else {
+          data[key][exType] += parseFloat(ex.distance) || 0;
+        }
+      });
+      return data;
+    }
 
-    exercises.forEach(exercise => {
-      const day = formatDate(exercise.date);
-      const distance = parseFloat(exercise.distance) || 0;
-      overallTotalDistance += distance;
-      overallTotalDuration += parseFloat(exercise.duration) || 0;
-      const maxSpeed = parseFloat(exercise.maxSpeed) || 0;
-      const minSpeed = parseFloat(exercise.minSpeed) || Infinity;
-      overallMaxSpeed = Math.max(overallMaxSpeed, maxSpeed);
-      if (minSpeed > 0 && minSpeed !== Infinity) {
-        overallMinSpeed = Math.min(overallMinSpeed, minSpeed);
-      }
-      if (!dailyData[day]) {
-        dailyData[day] = 0;
-      }
-      dailyData[day] += distance;
-    });
+    function renderChart(type, mode) {
+      const data = groupData(mode, type);
+      const labels = Object.keys(data).sort((a, b) => new Date(a) - new Date(b));
+      const allTypes = new Set();
+      labels.forEach(k => Object.keys(data[k]).forEach(t => allTypes.add(t)));
 
-    // Sort days and prepare chart data
-    const days = Object.keys(dailyData).sort();
-    const dailyDistances = days.map(day => dailyData[day]);
-    const cumulativeDistances = [];
-    dailyDistances.reduce((acc, cur) => {
-      const sum = acc + cur;
-      cumulativeDistances.push(sum);
-      return sum;
-    }, 0);
+      const datasets = Array.from(allTypes).map(exType => ({
+        label: exType,
+        data: labels.map(k => data[k][exType] || 0),
+        backgroundColor: '#' + Math.floor(Math.random() * 16777215).toString(16)
+      }));
 
-    // Overall average speed (km/h)
-    let averageSpeed = overallTotalDuration > 0 ? (overallTotalDistance / (overallTotalDuration/3600)) : 0;
-    overallMinSpeed = (overallMinSpeed === Infinity) ? 0 : overallMinSpeed;
-
-    // Update overall statistics in the DOM
-    document.getElementById('totalRuns').textContent = totalRuns;
-    document.getElementById('totalDistance').textContent = overallTotalDistance.toFixed(2);
-    document.getElementById('totalDuration').textContent = overallTotalDuration;
-    document.getElementById('averageSpeed').textContent = averageSpeed.toFixed(2);
-    document.getElementById('maxSpeedOverall').textContent = overallMaxSpeed.toFixed(2);
-    document.getElementById('minSpeedOverall').textContent = overallMinSpeed.toFixed(2);
-
-    // Create the Total Distance per Day bar chart
-    const ctx1 = document.getElementById('distanceBarChart').getContext('2d');
-    new Chart(ctx1, {
-      type: 'bar',
-      data: {
-        labels: days,
-        datasets: [{
-          label: 'Total Distance (km)',
-          data: dailyDistances,
-          backgroundColor: 'rgba(37,117,252,0.6)',
-          borderColor: 'rgba(37,117,252,1)',
-          borderWidth: 1
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: {
-          x: {
-            title: {
-              display: true,
-              text: 'Day'
-            }
-          },
-          y: {
-            beginAtZero: true,
-            title: {
-              display: true,
-              text: 'Distance (km)'
-            }
+      const config = {
+        type: 'bar',
+        data: { labels, datasets },
+        options: {
+          responsive: true,
+          plugins: { title: { display: true, text: `${type === 'duration' ? 'Duration (hrs)' : 'Distance (km)'} by ${mode}` } },
+          scales: {
+            x: { stacked: true },
+            y: { stacked: true, beginAtZero: true }
           }
         }
-      }
-    });
+      };
 
-    // Create the Cumulative Distance per Day line chart
-    const ctx2 = document.getElementById('cumulativeChart').getContext('2d');
-    new Chart(ctx2, {
-      type: 'line',
-      data: {
-        labels: days,
-        datasets: [{
-          label: 'Cumulative Distance (km)',
-          data: cumulativeDistances,
-          backgroundColor: 'rgba(37,117,252,0.4)',
-          borderColor: 'rgba(37,117,252,1)',
-          fill: true,
-          tension: 0.1
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: {
-          x: {
-            title: {
-              display: true,
-              text: 'Day'
-            }
-          },
-          y: {
-            beginAtZero: true,
-            title: {
-              display: true,
-              text: 'Cumulative Distance (km)'
-            }
-          }
-        }
+      if (type === 'duration') {
+        if (durationChart) durationChart.destroy();
+        durationChart = new Chart(durationCtx, config);
+      } else {
+        if (distanceChart) distanceChart.destroy();
+        distanceChart = new Chart(distanceCtx, config);
       }
-    });
+    }
+
+    function loadStats() {
+      document.getElementById('totalRuns').textContent = exercises.length;
+      let totalDist = 0, totalDur = 0, totalSpeed = 0, max = 0, min = Infinity;
+      exercises.forEach(ex => {
+        const dist = parseFloat(ex.distance);
+        const dur = parseFloat(ex.duration);
+        totalDist += dist;
+        totalDur += dur;
+        const speed = (dist / dur) * 3.6;
+        totalSpeed += speed;
+        if (parseFloat(ex.maxSpeed) > max) max = parseFloat(ex.maxSpeed);
+        if (parseFloat(ex.minSpeed) < min) min = parseFloat(ex.minSpeed);
+      });
+      document.getElementById('totalDistance').textContent = totalDist.toFixed(2);
+      document.getElementById('totalDuration').textContent = (totalDur / 3600).toFixed(2);
+      document.getElementById('averageSpeed').textContent = (totalSpeed / exercises.length).toFixed(2);
+      document.getElementById('maxSpeedOverall').textContent = max.toFixed(2);
+      document.getElementById('minSpeedOverall').textContent = min.toFixed(2);
+    }
+
+    loadStats();
+    renderChart('duration', 'week');
+    renderChart('distance', 'week');
   </script>
 </body>
 </html>
