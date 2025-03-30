@@ -1,4 +1,4 @@
-const CACHE_NAME = 'runtracker-cache-v2'; // v2 for v0.2
+const CACHE_NAME = 'runtracker-cache-v3'; // v3 for v0.3
 const urlsToCache = [
   'index.html',
   'history.html',

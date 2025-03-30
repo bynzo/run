@@ -34,21 +34,65 @@
       border-radius: 10px;
       padding: 20px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      padding-bottom: 80px;
     }
     .exercise-type {
-      font-size: 1.2em;
-      padding: 8px 12px;
-      margin: 0 5px 5px 5px;
-      border: 2px solid transparent;
-      border-radius: 6px;
-      background: #f2f2f2;
-      cursor: pointer;
-      transition: border 0.3s ease;
-    }
-    .exercise-type.selected {
-      border: 2px solid #2575fc;
-      background: #e0ebff;
-    }
+  font-size: 1em;
+  padding: 10px 12px;
+  margin: 5px 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #ccc;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #333;
+  font-weight: 500;
+  transition: background 0.3s ease, border 0.3s ease;
+}
+
+.exercise-type:hover {
+  background: #f0f4ff;
+  border-color: #2575fc;
+}
+
+.exercise-type.selected {
+  background: #2575fc;
+  color: #fff;
+  border-color: #1a5bcc;
+}
+
+.dropdown-wrapper {
+  margin-bottom: 20px;
+  width: 100%;
+}
+
+.dropdown-wrapper label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 8px;
+  font-size: 1.05em;
+  color: #444;
+}
+
+#exerciseDropdown {
+  width: 100%;
+  padding: 12px 14px;
+  font-size: 1.1em;
+  border-radius: 8px;
+  border: 2px solid #ccc;
+  background-color: #fff;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg viewBox='0 0 140 140' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M70 98l35-35H35z' fill='%23333'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 18px;
+}
+
+
+
     #timer {
       font-size: 2.5em;
       font-weight: 600;
@@ -85,26 +129,103 @@
       background: #1a5bcc;
     }
     footer {
-      width: 100%;
-      text-align: center;
-      padding: 10px;
-      margin-bottom: 10px;
-      color: #666;
-    }
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  background: linear-gradient(135deg, #6a11cb, #2575fc);
+  color: white;
+  text-align: center;
+  padding: 10px 0 5px;
+  box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.1);
+  z-index: 999;
+}
+
+.footer-nav {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  width: 100%;
+  font-size: 1.6em; 
+  margin-bottom: 5px;
+  padding: 8px 0;
+}
+
+
+
+.footer-link {
+  text-decoration: none;
+  color: white;
+  transition: transform 0.2s ease;
+}
+
+.footer-link:hover {
+  transform: scale(1.2);
+  color: #d0e4ff;
+}
+
+.footer-version {
+  font-size: 0.9em;
+}
+
+.footer-link.selected {
+  position: relative;
+  color: #fff;
+  font-size: 2.5em; /* slightly larger than inactive icons */
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transform: scale(1.2);
+  text-shadow: 0 0 4px rgba(255, 255, 255, 0.5);
+}
+
+.footer-link.selected::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 42px;
+  height: 42px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  z-index: -1;
+  animation: pulseHalo 1.5s infinite ease-in-out;
+}
+
+@keyframes pulseHalo {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.6;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.2);
+    opacity: 0.8;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.6;
+  }
+}
+
+
+
   </style>
 </head>
 <body>
-  <header><h1>Running Tracker</h1></header>
+  <header><h1>Exercise Tracker</h1></header>
   <main>
-    <div id="exerciseTypeSelection">
-      <p>Select Exercise Type:</p>
-      <button class="exercise-type" data-type="Run">🏃‍♂️ Run</button>
-      <button class="exercise-type" data-type="Walk">🚶‍♀️ Walk</button>
-      <button class="exercise-type" data-type="Bike">🚴‍♂️ Bike</button>
-      <button class="exercise-type" data-type="Ski">🎿 Ski</button>
-      <button class="exercise-type" data-type="Paddle Board">🏄‍♂️ Paddle Board</button>
+    <div id="exerciseTypeSelection" class="dropdown-wrapper">
+      <label for="exerciseDropdown">Select Exercise Type:</label>
+      <select id="exerciseDropdown">
+        <option value="">-- Choose an activity --</option>
+        <option value="Run">🏃‍♂️ Run</option>
+        <option value="Walk">🚶‍♀️ Walk</option>
+        <option value="Bike">🚴‍♂️ Bike</option>
+        <option value="Ski">🎿 Ski</option>
+        <option value="Paddle Board">🏄‍♂️ Paddle Board</option>
+      </select>
     </div>
-
+     
+    <button id="startStopBtn">Start</button>
     <div id="timer">00:00:00</div>
     <div id="stats">
       <p>Distance: <span id="distance">0</span> km</p>
@@ -113,14 +234,17 @@
       <p>Max Speed: <span id="maxSpeed">0</span> km/h</p>
       <p>Min Speed: <span id="minSpeed">0</span> km/h</p>
     </div>
-    <button id="startStopBtn">Start</button>
+    
     <div id="map"></div>
-    <div style="display: flex; justify-content: space-between; gap: 20px;">
-      <a class="nav-button" href="history.html">View Past Exercises</a>
-      <a class="nav-button" href="stats.html">View Statistics</a>
-    </div>
   </main>
-  <footer>Running Tracker 2025 v0.2</footer>
+  <footer>
+    <div class="footer-nav">
+      <a href="index.html" class="footer-link selected" title="Tracker">🏃</a>
+      <a href="history.html" class="footer-link" title="History">📜</a>
+      <a href="stats.html" class="footer-link" title="Stats">📊</a>
+    </div>
+    <div class="footer-version">Exercise Tracker 2025 v0.3</div>
+  </footer>
 
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script>
@@ -137,14 +261,21 @@
     let maxSpeed = 0;
     let minSpeed = Infinity;
     let totalDistance = 0;
+    let speedSamples = [];
+    const MAX_SAMPLES = 5;
 
-    document.querySelectorAll('.exercise-type').forEach(button => {
-      button.addEventListener('click', function () {
-        document.querySelectorAll('.exercise-type').forEach(btn => btn.classList.remove('selected'));
-        this.classList.add('selected');
-        selectedExerciseType = this.getAttribute('data-type');
-      });
-    });
+    const timerEl = document.getElementById('timer');
+    const distanceEl = document.getElementById('distance');
+    const currentSpeedEl = document.getElementById('currentSpeed');
+    const avgSpeedEl = document.getElementById('avgSpeed');
+    const maxSpeedEl = document.getElementById('maxSpeed');
+    const minSpeedEl = document.getElementById('minSpeed');
+    const btn = document.getElementById('startStopBtn');
+
+    document.getElementById('exerciseDropdown').addEventListener('change', function () {
+  selectedExerciseType = this.value;
+});
+
 
     function fetchWeather(lat, lon) {
       if (!lat || !lon || isNaN(lat) || isNaN(lon)) return;
@@ -245,38 +376,55 @@
     }
 
     function positionSuccess(position) {
-  const { latitude, longitude } = position.coords;
-
-  if (!latitude || !longitude || isNaN(latitude) || isNaN(longitude)) {
-    console.warn("Invalid GPS coordinates, skipping this point.");
-    return;
-  }
-
+  const { latitude, longitude, speed, accuracy } = position.coords;
   const timestamp = position.timestamp;
-  if (positions.length > 0) {
+
+  // ✅ Validate coordinates
+  if (!latitude || !longitude || isNaN(latitude) || isNaN(longitude)) return;
+
+  // ✅ Skip inaccurate GPS fixes
+  if (accuracy > 20) return;
+
+  let rawSpeed = 0;
+
+  // ✅ Use device's speed if available and valid
+  if (speed !== null && !isNaN(speed) && speed > 0.5) {
+    rawSpeed = speed;
+  } else if (positions.length > 0) {
     const prev = positions[positions.length - 1];
     const d = computeDistance(prev.coords.latitude, prev.coords.longitude, latitude, longitude);
     const t = (timestamp - prev.timestamp) / 1000;
+
+    // ✅ Ignore short distances or intervals
+    if (d < 10 || t < 3) return;
+
+    rawSpeed = d / t;
     totalDistance += d;
-    currentSpeed = t > 0 ? d / t : 0;
   }
 
-  if (currentSpeed > 0) {
-    maxSpeed = Math.max(maxSpeed, currentSpeed);
-    minSpeed = Math.min(minSpeed, currentSpeed);
+  // ✅ Smooth speed using rolling average
+  speedSamples.push(rawSpeed);
+  if (speedSamples.length > MAX_SAMPLES) speedSamples.shift();
+  const smoothedSpeed = speedSamples.reduce((sum, val) => sum + val, 0) / speedSamples.length;
+
+  if (smoothedSpeed > 0) {
+    maxSpeed = Math.max(maxSpeed, smoothedSpeed);
+    minSpeed = Math.min(minSpeed, smoothedSpeed);
   }
 
   positions.push({ coords: { latitude, longitude }, timestamp });
   polyline.addLatLng([latitude, longitude]);
   map.setView([latitude, longitude], 16);
 
-  document.getElementById('distance').textContent = (totalDistance / 1000).toFixed(2);
-  document.getElementById('currentSpeed').textContent = (currentSpeed * 3.6).toFixed(2);
-  const avgSpeed = elapsedTime > 0 ? (totalDistance / elapsedTime) : 0;
-  document.getElementById('avgSpeed').textContent = (avgSpeed * 3.6).toFixed(2);
-  document.getElementById('maxSpeed').textContent = (maxSpeed * 3.6).toFixed(2);
-  document.getElementById('minSpeed').textContent = (minSpeed === Infinity ? 0 : (minSpeed * 3.6).toFixed(2));
+  distanceEl.textContent = (totalDistance / 1000).toFixed(2);
+  currentSpeedEl.textContent = (smoothedSpeed * 3.6).toFixed(2);
+  const avgSpeed = elapsedTime > 0 ? totalDistance / elapsedTime : 0;
+  avgSpeedEl.textContent = (avgSpeed * 3.6).toFixed(2);
+  maxSpeedEl.textContent = (maxSpeed * 3.6).toFixed(2);
+  minSpeedEl.textContent = (minSpeed === Infinity ? 0 : (minSpeed * 3.6).toFixed(2));
 }
+
+
 
 
     function positionError(error) {
@@ -306,5 +454,40 @@
       }
     }
   </script>
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('service-worker.js')
+      .then(reg => {
+        reg.onupdatefound = () => {
+          const newWorker = reg.installing;
+          newWorker.onstatechange = () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              const updateBanner = document.createElement('div');
+              updateBanner.innerHTML = `
+                <div style="
+                  position: fixed;
+                  bottom: 70px;
+                  left: 50%;
+                  transform: translateX(-50%);
+                  background: #2575fc;
+                  color: white;
+                  padding: 12px 20px;
+                  border-radius: 30px;
+                  font-weight: 600;
+                  box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+                  z-index: 1000;
+                ">
+                  🔄 New version available. <span style="text-decoration: underline; cursor: pointer;" onclick="location.reload()">Update</span>
+                </div>
+              `;
+              document.body.appendChild(updateBanner);
+            }
+          };
+        };
+      })
+      .catch(err => console.error("Service worker registration failed:", err));
+  }
+  </script>
+  
 </body>
 </html>
