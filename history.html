@@ -6,165 +6,19 @@
   <title>Exercise History</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
-  <style>
-    body {
-      font-family: 'Montserrat', sans-serif;
-      margin: 0;
-      padding: 0;
-      background: #f7f9fc;
-      color: #333;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-    header {
-      width: 100%;
-      padding: 15px;
-      background: linear-gradient(135deg, #6a11cb, #2575fc);
-      color: white;
-      text-align: center;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    main {
-      width: 90%;
-      max-width: 1000px;
-      margin: 20px 0;
-      background: white;
-      border-radius: 10px;
-      padding: 20px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-      padding-bottom: 150px;
-    }
-    .table-container {
-      width: 100%;
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-      margin-bottom: 20px;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      min-width: 900px;
-    }
-    th, td {
-      padding: 10px;
-      border-bottom: 1px solid #ddd;
-      text-align: center;
-      white-space: nowrap;
-    }
-    th {
-      background-color: #f2f2f2;
-      font-weight: 600;
-    }
-    .nav-button {
-      display: inline-block;
-      padding: 10px;
-      background: #2575fc;
-      color: white;
-      border-radius: 6px;
-      text-align: center;
-      font-weight: 600;
-      transition: background 0.3s ease;
-      text-decoration: none;
-      border: none;
-      cursor: pointer;
-    }
-    .nav-button:hover {
-      background: #1a5bcc;
-    }
-    #routeView {
-      display: none;
-      margin-top: 20px;
-    }
-    #map {
-      width: 100%;
-      height: 300px;
-      border-radius: 10px;
-      margin-bottom: 15px;
-    }
-    footer {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  width: 100%;
-  background: linear-gradient(135deg, #6a11cb, #2575fc);
-  color: white;
-  text-align: center;
-  padding: 10px 0 5px; /* increased top & bottom padding */
-  box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.1);
-  z-index: 999;
-}
-
-.footer-nav {
-  display: flex;
-  justify-content: space-around;
-  align-items: center;
-  width: 100%;
-  font-size: 1.6em; 
-  margin-bottom: 5px;
-  padding: 8px 0;
-}
-
-
-
-.footer-link {
-  text-decoration: none;
-  color: white;
-  transition: transform 0.2s ease;
-}
-
-.footer-link:hover {
-  transform: scale(1.2);
-  color: #d0e4ff;
-}
-
-.footer-version {
-  font-size: 0.9em;
-}
-
-.footer-link.selected {
-  position: relative;
-  color: #fff;
-  font-size: 2.5em; /* slightly larger than inactive icons */
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-  transform: scale(1.2);
-  text-shadow: 0 0 4px rgba(255, 255, 255, 0.5);
-}
-
-.footer-link.selected::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 42px;
-  height: 42px;
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-  z-index: -1;
-  animation: pulseHalo 1.5s infinite ease-in-out;
-}
-
-@keyframes pulseHalo {
-  0% {
-    transform: translate(-50%, -50%) scale(1);
-    opacity: 0.6;
-  }
-  50% {
-    transform: translate(-50%, -50%) scale(1.2);
-    opacity: 0.8;
-  }
-  100% {
-    transform: translate(-50%, -50%) scale(1);
-    opacity: 0.6;
-  }
-}
-
-  </style>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <header><h1>Past Exercises</h1></header>
-  <main>
+  <header>
+    <h1>Past Exercises</h1>
+    <div class="header-nav">
+      <a href="index.html" title="Tracker">🏃</a>
+      <a href="history.html" class="active" title="History">📜</a>
+      <a href="stats.html" title="Stats">📊</a>
+    </div>
+  </header>
+
+  <main id="historyMain">
     <div class="table-container">
       <table id="exercisesTable">
         <thead>
@@ -188,108 +42,8 @@
       <button class="nav-button" onclick="closeRoute()">Close</button>
     </div>
   </main>
-  <footer>
-    <div class="footer-nav">
-      <a href="index.html" class="footer-link" title="Tracker">🏃</a>
-      <a href="history.html" class="footer-link selected" title="History">📜</a>
-      <a href="stats.html" class="footer-link" title="Stats">📊</a>
-    </div>
-    <div class="footer-version">Exercise Tracker 2025 v0.3</div>
-  </footer>
-  
 
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-  <script>
-    const exercises = JSON.parse(localStorage.getItem('exercises')) || [];
-    const tableBody = document.querySelector('#exercisesTable tbody');
-
-    exercises.forEach((exercise, index) => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${exercise.date}</td>
-        <td>${exercise.duration}</td>
-        <td>${exercise.distance}</td>
-        <td>${exercise.avgSpeed}</td>
-        <td>${exercise.maxSpeed}</td>
-        <td>${exercise.minSpeed}</td>
-        <td>${exercise.exerciseType || 'N/A'}</td>
-        <td>${exercise.weather ? `${exercise.weather.description}, ${exercise.weather.temperature}°C` : 'N/A'}</td>
-        <td><button class="nav-button" style="padding:6px 10px; font-size: 14px;" onclick="viewRoute(${index})">View</button></td>
-      `;
-      tableBody.appendChild(tr);
-    });
-
-    let map;
-    function viewRoute(index) {
-      const exercise = exercises[index];
-      if (!exercise || !exercise.positions || exercise.positions.length === 0) {
-        alert("No route data available for this exercise.");
-        return;
-      }
-
-      const routeViewDiv = document.getElementById('routeView');
-      routeViewDiv.style.display = 'block';
-
-      const mapContainer = document.getElementById('map');
-      mapContainer.innerHTML = ""; // clear previous map
-      if (mapContainer._leaflet_id) {
-        mapContainer._leaflet_id = null;
-      }
-
-      map = L.map('map').setView([0, 0], 13);
-
-      L.tileLayer('https://mt1.google.com/vt/lyrs=r&x={x}&y={y}&z={z}', {
-        attribution: '© Google Maps',
-        maxZoom: 20
-      }).addTo(map);
-
-      const latlngs = exercise.positions.map(p => [p.coords.latitude, p.coords.longitude]);
-      const polyline = L.polyline(latlngs, { color: 'red' }).addTo(map);
-
-      L.marker(latlngs[0]).addTo(map).bindPopup("Start");
-      L.marker(latlngs[latlngs.length - 1]).addTo(map).bindPopup("Finish");
-
-      map.fitBounds(polyline.getBounds());
-    }
-
-    function closeRoute() {
-      document.getElementById('routeView').style.display = 'none';
-    }
-  </script>
-<script>
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('service-worker.js')
-      .then(reg => {
-        reg.onupdatefound = () => {
-          const newWorker = reg.installing;
-          newWorker.onstatechange = () => {
-            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              const updateBanner = document.createElement('div');
-              updateBanner.innerHTML = `
-                <div style="
-                  position: fixed;
-                  bottom: 70px;
-                  left: 50%;
-                  transform: translateX(-50%);
-                  background: #2575fc;
-                  color: white;
-                  padding: 12px 20px;
-                  border-radius: 30px;
-                  font-weight: 600;
-                  box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-                  z-index: 1000;
-                ">
-                  🔄 New version available. <span style="text-decoration: underline; cursor: pointer;" onclick="location.reload()">Update</span>
-                </div>
-              `;
-              document.body.appendChild(updateBanner);
-            }
-          };
-        };
-      })
-      .catch(err => console.error("Service worker registration failed:", err));
-  }
-  </script>
-  
+  <script src="app.js"></script>
 </body>
 </html>

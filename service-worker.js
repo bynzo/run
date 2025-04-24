@@ -1,4 +1,5 @@
-const CACHE_NAME = 'runtracker-cache-v3'; // v3 for v0.3
+// service‑worker.js
+const CACHE_NAME = 'runtracker-cache-v4';  // ← bump this on each release
 const urlsToCache = [
   'index.html',
   'history.html',
@@ -12,38 +13,45 @@ const urlsToCache = [
   'https://cdn.jsdelivr.net/npm/chart.js'
 ];
 
-self.addEventListener('install', (event) => {
+self.addEventListener('install', event => {
+  // immediately activate new SW
+  self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(urlsToCache);
-    })
+    caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache))
   );
 });
 
-self.addEventListener('fetch', (event) => {
+self.addEventListener('activate', event => {
+  // claim clients right away
+  event.waitUntil(
+    caches.keys().then(keys =>
+      Promise.all(
+        keys.map(key => key !== CACHE_NAME ? caches.delete(key) : null)
+      )
+    ).then(() => self.clients.claim())
+  );
+});
+
+self.addEventListener('fetch', event => {
+  // only handle GETs from our origin
+  if (event.request.method !== 'GET' ||
+      new URL(event.request.url).origin !== location.origin) {
+    return;
+  }
+
   event.respondWith(
-    caches.match(event.request).then((response) => {
-      return response || fetch(event.request).then((networkResponse) => {
-        if (!networkResponse || networkResponse.status !== 200) return networkResponse;
-        return caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, networkResponse.clone());
-          return networkResponse;
+    // try network first...
+    fetch(event.request)
+      .then(networkRes => {
+        // update cache in background
+        caches.open(CACHE_NAME).then(cache => {
+          cache.put(event.request, networkRes.clone());
         });
-      });
-    })
-  );
-});
-
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    })
+        return networkRes;
+      })
+      .catch(() => {
+        // fallback to cache
+        return caches.match(event.request);
+      })
   );
 });
