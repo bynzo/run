@@ -41,9 +41,6 @@
     <div id="stats">
       <p>Distance: <span id="distance">0</span> km</p>
       <p>Current Speed: <span id="currentSpeed">0</span> km/h</p>
-      <p>Average Speed: <span id="avgSpeed">0</span> km/h</p>
-      <p>Max Speed: <span id="maxSpeed">0</span> km/h</p>
-      <p>Min Speed: <span id="minSpeed">0</span> km/h</p>
     </div>
 
     <div id="map"></div>
@@ -52,28 +49,25 @@
   <!-- Leaflet -->
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
-  <!-- Firebase & Auth Initialization -->
+  <!-- Firebase & Auth Initialization (unchanged) -->
   <script type="module">
     // TODO: replace these values with your Firebase project's config
     const firebaseConfig = {
-    apiKey: "AIzaSyCX4vYmL8LIygOgmoE0B9c7FlL2vHJPJmM",
-    authDomain: "runtracker-f372e.firebaseapp.com",
-    projectId: "runtracker-f372e",
-    storageBucket: "runtracker-f372e.firebasestorage.app",
-    messagingSenderId: "144324009143",
-    appId: "1:144324009143:web:6cffe5b2192f6f9aee4132"
-  };
-
+      apiKey: "AIzaSyCX4vYmL8LIygOgmoE0B9c7FlL2vHJPJmM",
+      authDomain: "runtracker-f372e.firebaseapp.com",
+      projectId: "runtracker-f372e",
+      storageBucket: "runtracker-f372e.firebasestorage.app",
+      messagingSenderId: "144324009143",
+      appId: "1:144324009143:web:6cffe5b2192f6f9aee4132"
+    };
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js';
     import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js';
     import { getFirestore } from 'https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js';
 
-    // initialize Firebase
     const app  = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db   = getFirestore(app);
 
-    // redirect if not signed in, otherwise show email
     onAuthStateChanged(auth, user => {
       if (!user) {
         window.location.href = 'login.html';
@@ -82,7 +76,6 @@
       }
     });
 
-    // expose sign-out to global scope
     window.doSignOut = () => {
       signOut(auth).then(() => {
         window.location.href = 'login.html';

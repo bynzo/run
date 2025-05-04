@@ -3,13 +3,13 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.1/firebas
 import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js';
 
 // ─── Threshold constants ───
-const MIN_DISTANCE    = 3;      // meters
-const MIN_TIME        = 1;      // seconds
-const MIN_SPEED_KMH   = 3;      // km/h
-const MIN_SPEED       = MIN_SPEED_KMH / 3.6; // ≈0.83 m/s
-const MAX_ACCURACY    = 50;     // meters
+const MIN_DISTANCE  = 3;      // meters
+const MIN_TIME      = 1;      // seconds
+const MIN_SPEED_KMH = 3;      // km/h
+const MIN_SPEED     = MIN_SPEED_KMH / 3.6; // ≈0.83 m/s
+const MAX_ACCURACY  = 50;     // meters
 
-// ─── Your Firebase project’s config ───
+// ─── Firebase config ───
 const firebaseConfig = {
   apiKey: "AIzaSyCX4vYmL8LIygOgmoE0B9c7FlL2vHJPJmM",
   authDomain: "runtracker-f372e.firebaseapp.com",
@@ -20,11 +20,9 @@ const firebaseConfig = {
 };
 const fbApp = initializeApp(firebaseConfig);
 const auth  = getAuth(fbApp);
-// Redirect to login if not signed in
 onAuthStateChanged(auth, user => {
   if (!user) window.location.href = 'login.html';
 });
-// Expose sign-out
 window.doSignOut = () => signOut(auth).then(() => window.location.href = 'login.html');
 
 // === SCREEN WAKE LOCK LOGIC ===
@@ -89,27 +87,26 @@ document.addEventListener('DOMContentLoaded', () => {
   // === INDEX PAGE LOGIC ===
   if (document.getElementById('startStopBtn')) {
     let selectedExerciseType = null,
-        currentWeather = null,
-        running = false,
+        currentWeather      = null,
+        running              = false,
         timerInterval,
         startTime,
-        elapsedTime = 0,
-        positions = [],
+        elapsedTime         = 0,
+        positions           = [],
         watchId,
         map, polyline,
-        totalDistance = 0,
-        speedSamples = [],
-        maxSpeed = 0,
-        minSpeed = Infinity;
+        totalDistance       = 0,
+        speedSamples        = [],
+        maxSpeed            = 0,
+        minSpeed            = Infinity;
 
     const distanceEl     = document.getElementById('distance');
     const currentSpeedEl = document.getElementById('currentSpeed');
     const timerEl        = document.getElementById('timer');
     const btn            = document.getElementById('startStopBtn');
 
-    document.getElementById('exerciseDropdown').addEventListener('change', e => {
-      selectedExerciseType = e.target.value;
-    });
+    document.getElementById('exerciseDropdown')
+      .addEventListener('change', e => selectedExerciseType = e.target.value);
 
     function fetchWeather(lat, lon) {
       if (!lat||!lon||isNaN(lat)||isNaN(lon)) return;
@@ -118,7 +115,7 @@ document.addEventListener('DOMContentLoaded', () => {
         .then(data => {
           if (data.current_weather) {
             const code = data.current_weather.weathercode;
-            const desc = code === 0   ? "Clear"
+            const desc = code === 0               ? "Clear"
                        : [1,2,3].includes(code) ? "Partly Cloudy"
                        : [45,48].includes(code)  ? "Fog"
                        : [51,53,55].includes(code)? "Drizzle"
@@ -146,11 +143,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function computeDistance(lat1, lon1, lat2, lon2) {
-      const R = 6371e3,
+      const R  = 6371e3,
             φ1 = lat1 * Math.PI/180,
             φ2 = lat2 * Math.PI/180,
-            Δφ = (lat2-lat1)*Math.PI/180,
-            Δλ = (lon2-lon1)*Math.PI/180,
+            Δφ = (lat2 - lat1)*Math.PI/180,
+            Δλ = (lon2 - lon1)*Math.PI/180,
             a  = Math.sin(Δφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2,
             c  = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
       return R * c;
@@ -162,14 +159,14 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
       await requestWakeLock();
-      running = true;
-      startTime = Date.now();
-      elapsedTime = 0;
-      positions = [];
+      running       = true;
+      startTime     = Date.now();
+      elapsedTime   = 0;
+      positions     = [];
       totalDistance = 0;
-      maxSpeed = 0;
-      minSpeed = Infinity;
-      speedSamples = [];
+      maxSpeed      = 0;
+      minSpeed      = Infinity;
+      speedSamples  = [];
       timerInterval = setInterval(updateTimer, 1000);
       btn.textContent = "Stop";
 
@@ -190,15 +187,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const avg = elapsedTime > 0 ? (totalDistance/elapsedTime)*3.6 : 0;
       const ex  = {
-        date: new Date(startTime).toLocaleString(),
-        duration: elapsedTime,
-        distance: (totalDistance / 1000).toFixed(2),
-        avgSpeed: avg.toFixed(2),
-        maxSpeed: (maxSpeed*3.6).toFixed(2),
-        minSpeed: ((minSpeed===Infinity?0:minSpeed)*3.6).toFixed(2),
+        date:         new Date(startTime).toLocaleString(),
+        duration:     elapsedTime,
+        distance:     (totalDistance/1000).toFixed(2),
+        avgSpeed:     avg.toFixed(2),
+        maxSpeed:     (maxSpeed*3.6).toFixed(2),
+        minSpeed:     ((minSpeed===Infinity?0:minSpeed)*3.6).toFixed(2),
         positions,
         exerciseType: selectedExerciseType,
-        weather: currentWeather
+        weather:      currentWeather
       };
       const all = JSON.parse(localStorage.getItem('exercises')||'[]');
       all.push(ex);
@@ -209,45 +206,37 @@ document.addEventListener('DOMContentLoaded', () => {
     function positionSuccess(pos) {
       const { latitude, longitude, speed, accuracy } = pos.coords;
       const timestamp = pos.timestamp;
+      if (isNaN(latitude)||isNaN(longitude)||accuracy>MAX_ACCURACY) return;
 
-      // sanity checks
-      if (isNaN(latitude)||isNaN(longitude)||accuracy > MAX_ACCURACY) return;
-
-      // first fix: just register starting point
-      if (positions.length === 0) {
+      if (positions.length===0) {
         positions.push({ coords:{latitude,longitude}, timestamp });
-        if (polyline) polyline.addLatLng([latitude, longitude]);
-        if (map)     map.setView([latitude, longitude], 16);
+        polyline?.addLatLng([latitude, longitude]);
+        map?.setView([latitude, longitude], 16);
         return;
       }
 
-      // compute leg distance & time
       const prev = positions[positions.length-1];
       const d    = computeDistance(prev.coords.latitude, prev.coords.longitude, latitude, longitude);
       const t    = (timestamp - prev.timestamp)/1000;
-      if (d < MIN_DISTANCE || t < MIN_TIME) return;
+      if (d<MIN_DISTANCE||t<MIN_TIME) return;
 
-      // pick rawSpeed
       const rawSpeed = (speed!==null && !isNaN(speed)) ? speed : d/t;
-      if (rawSpeed < MIN_SPEED) return;
+      if (rawSpeed<MIN_SPEED) return;
 
-      // accept leg
       totalDistance += d;
       positions.push({ coords:{latitude,longitude}, timestamp });
       speedSamples.push(rawSpeed);
-      if (speedSamples.length > 5) speedSamples.shift();
+      if (speedSamples.length>5) speedSamples.shift();
 
-      // update smoothing & bounds
       const sm = speedSamples.reduce((a,b)=>a+b,0)/speedSamples.length;
       maxSpeed = Math.max(maxSpeed, sm);
       minSpeed = Math.min(minSpeed, sm);
 
-      // draw & update UI
-      if (polyline) polyline.addLatLng([latitude, longitude]);
-      if (map)     map.setView([latitude, longitude], 16);
+      polyline?.addLatLng([latitude, longitude]);
+      map?.setView([latitude, longitude], 16);
 
-      distanceEl.textContent     = (totalDistance / 1000).toFixed(2);
-      currentSpeedEl.textContent = (sm * 3.6).toFixed(2);
+      distanceEl.textContent     = (totalDistance/1000).toFixed(2);
+      currentSpeedEl.textContent = (sm*3.6).toFixed(2);
     }
 
     function positionError(err) {
@@ -259,12 +248,12 @@ document.addEventListener('DOMContentLoaded', () => {
     window.onload = () => {
       map = L.map('map').setView([0,0],2);
       L.tileLayer('https://mt1.google.com/vt/lyrs=r&x={x}&y={y}&z={z}', {
-        attribution: '© Google Maps', maxZoom: 20
+        attribution:'© Google Maps', maxZoom:20
       }).addTo(map);
       polyline = L.polyline([], { color:'red', weight:5 }).addTo(map);
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(p => {
-          const lat = p.coords.latitude, lng = p.coords.longitude;
+          const lat=p.coords.latitude, lng=p.coords.longitude;
           if (!isNaN(lat)&&!isNaN(lng)) {
             map.setView([lat,lng],16);
             L.marker([lat,lng]).addTo(map).bindPopup("You are here").openPopup();
@@ -275,51 +264,76 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // === HISTORY PAGE LOGIC ===
-  if (document.querySelector('#exercisesTable')) {
+  if (document.getElementById('historyList')) {
     const exercises = JSON.parse(localStorage.getItem('exercises')||'[]');
-    const tbody     = document.querySelector('#exercisesTable tbody');
+    const container = document.getElementById('historyList');
 
-    exercises.forEach((ex,i) => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${ex.date}</td>
-        <td>${ex.duration}</td>
-        <td>${ex.distance}</td>
-        <td>${ex.avgSpeed}</td>
-        <td>${ex.maxSpeed}</td>
-        <td>${ex.minSpeed}</td>
-        <td>${ex.exerciseType||'N/A'}</td>
-        <td>${ex.weather?`${ex.weather.description}, ${ex.weather.temperature}°C`:'N/A'}</td>
-        <td><button class="nav-button" onclick="viewRoute(${i})">View</button></td>
-      `;
-      tbody.appendChild(tr);
+    function renderHistory() {
+      container.innerHTML = '';
+      exercises.forEach((ex,i) => {
+        const card = document.createElement('div');
+        const durationMin = (ex.duration / 60).toFixed(2);
+        card.className = 'exercise-card';
+        card.innerHTML = `
+          <div class="card-header">
+            <div class="card-date">${ex.date}</div>
+            <div class="card-actions">
+              <button class="map-btn" data-index="${i}" title="View Map">📍</button>
+              <button class="delete-btn" data-index="${i}" title="Delete">🗑️</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <p><strong>Duration:</strong> ${durationMin} min</p>
+            <p><strong>Distance:</strong> ${ex.distance} km</p>
+            <p><strong>Avg Speed:</strong> ${ex.avgSpeed} km/h</p>
+            <p><strong>Max Speed:</strong> ${ex.maxSpeed} km/h</p>
+            <p><strong>Min Speed:</strong> ${ex.minSpeed} km/h</p>
+            <p><strong>Type:</strong> ${ex.exerciseType||'N/A'}</p>
+            <p><strong>Weather:</strong> ${ex.weather?ex.weather.description+', '+ex.weather.temperature+'°C':'N/A'}</p>
+          </div>`;
+        container.appendChild(card);
+      });
+    }
+
+    renderHistory();
+
+    container.addEventListener('click', e => {
+      if (e.target.matches('.delete-btn')) {
+        const idx = +e.target.dataset.index;
+        if (confirm('Delete this exercise?')) {
+          exercises.splice(idx,1);
+          localStorage.setItem('exercises',JSON.stringify(exercises));
+          renderHistory();
+        }
+      }
+      if (e.target.matches('.map-btn')) {
+        viewRoute(+e.target.dataset.index);
+      }
     });
-
-    window.viewRoute = index => {
-      const ex = exercises[index];
-      if (!ex?.positions?.length) return alert("No route data available.");
-      document.getElementById('routeView').style.display = 'block';
-
-      const mapDiv = document.getElementById('map');
-      mapDiv.innerHTML = '';
-      if (mapDiv._leaflet_id) mapDiv._leaflet_id = null;
-
-      const routeMap = L.map('map').setView([0,0],13);
-      L.tileLayer('https://mt1.google.com/vt/lyrs=r&x={x}&y={y}&z={z}', {
-        attribution:'© Google Maps', maxZoom:20
-      }).addTo(routeMap);
-
-      const latlngs = ex.positions.map(p=>[p.coords.latitude,p.coords.longitude]);
-      const poly   = L.polyline(latlngs,{color:'red'}).addTo(routeMap);
-      L.marker(latlngs[0]).addTo(routeMap).bindPopup("Start");
-      L.marker(latlngs[latlngs.length-1]).addTo(routeMap).bindPopup("Finish");
-      routeMap.fitBounds(poly.getBounds());
-    };
-
-    window.closeRoute = () => {
-      document.getElementById('routeView').style.display = 'none';
-    };
   }
+
+  // === VIEW ROUTE & CLOSE ===
+  window.viewRoute = index => {
+    const exercises = JSON.parse(localStorage.getItem('exercises')||'[]');
+    const ex = exercises[index];
+    if (!ex?.positions?.length) return alert("No route data available.");
+    document.getElementById('routeView').style.display = 'block';
+    const mapDiv = document.getElementById('map');
+    mapDiv.innerHTML = '';
+    if (mapDiv._leaflet_id) mapDiv._leaflet_id = null;
+    const routeMap = L.map('map').setView([0,0],13);
+    L.tileLayer('https://mt1.google.com/vt/lyrs=r&x={x}&y={y}&z={z}', {
+      attribution:'© Google Maps', maxZoom:20
+    }).addTo(routeMap);
+    const latlngs = ex.positions.map(p=>[p.coords.latitude,p.coords.longitude]);
+    L.polyline(latlngs,{color:'red'}).addTo(routeMap);
+    L.marker(latlngs[0]).addTo(routeMap).bindPopup("Start");
+    L.marker(latlngs.at(-1)).addTo(routeMap).bindPopup("Finish");
+    routeMap.fitBounds(L.polyline(latlngs).getBounds());
+  };
+  window.closeRoute = () => {
+    document.getElementById('routeView').style.display = 'none';
+  };
 
   // === STATS PAGE LOGIC ===
   if (document.getElementById('durationChart')) {
@@ -347,11 +361,11 @@ document.addEventListener('DOMContentLoaded', () => {
         end   = new Date(now.getFullYear(), now.getMonth()+1,0);
       }
 
-      const labels = [], map = {};
-      for (let dt = new Date(start); dt <= end; dt.setDate(dt.getDate()+1)) {
+      const labels = [], mapData = {};
+      for (let dt=new Date(start); dt<=end; dt.setDate(dt.getDate()+1)) {
         const lbl = dt.toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'});
         labels.push(lbl);
-        map[lbl] = {};
+        mapData[lbl] = {};
       }
 
       exercises.forEach(ex => {
@@ -360,17 +374,18 @@ document.addEventListener('DOMContentLoaded', () => {
         const val = type==='duration'
                     ? (parseFloat(ex.duration)||0)/3600
                     : parseFloat(ex.distance)||0;
-        map[key] = map[key]||{};
-        map[key][ex.exerciseType||'Unknown'] = (map[key][ex.exerciseType||'Unknown']||0) + val;
+        mapData[key] = mapData[key]||{};
+        mapData[key][ex.exerciseType||'Unknown'] =
+          (mapData[key][ex.exerciseType||'Unknown']||0) + val;
       });
 
       const allTypes = new Set();
-      Object.values(map).forEach(o => Object.keys(o).forEach(t => allTypes.add(t)));
+      Object.values(mapData).forEach(o=>Object.keys(o).forEach(t=>allTypes.add(t)));
 
-      const datasets = Array.from(allTypes).map(t => ({
+      const datasets = Array.from(allTypes).map(t=>({
         label: t,
-        data: labels.map(l => map[l][t]||0),
-        backgroundColor: '#' + Math.floor(Math.random()*16777215).toString(16)
+        data: labels.map(l=>mapData[l][t]||0),
+        backgroundColor: '#'+Math.floor(Math.random()*16777215).toString(16)
       }));
 
       const cfg = {
@@ -399,27 +414,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('durationToggleBtn').onclick = () => {
       chartModes.duration = chartModes.duration==='week'?'month':'week';
-      document.getElementById('durationToggleBtn').textContent = chartModes.duration==='week'?'Week View':'Month View';
+      document.getElementById('durationToggleBtn').textContent =
+        chartModes.duration==='week'?'Week View':'Month View';
       renderChart('duration', chartModes.duration);
     };
     document.getElementById('distanceToggleBtn').onclick = () => {
       chartModes.distance = chartModes.distance==='week'?'month':'week';
-      document.getElementById('distanceToggleBtn').textContent = chartModes.distance==='week'?'Week View':'Month View';
+      document.getElementById('distanceToggleBtn').textContent =
+        chartModes.distance==='week'?'Week View':'Month View';
       renderChart('distance', chartModes.distance);
     };
 
     // summary stats
     document.getElementById('totalRuns').textContent = exercises.length;
     let totD=0, totT=0, totS=0, mx=0, mn=Infinity;
-    exercises.forEach(ex => {
-      const d = parseFloat(ex.distance)||0,
-            t = parseFloat(ex.duration)||0,
-            s = (d/t)*3.6;
-      totD += d;
-      totT += t;
-      totS += s;
-      mx = Math.max(mx, parseFloat(ex.maxSpeed)||0);
-      mn = Math.min(mn, parseFloat(ex.minSpeed)||Infinity);
+    exercises.forEach(ex=>{
+      const d=parseFloat(ex.distance)||0,
+            t=parseFloat(ex.duration)||0,
+            s=(d/t)*3.6;
+      totD+=d; totT+=t; totS+=s;
+      mx=Math.max(mx,parseFloat(ex.maxSpeed)||0);
+      mn=Math.min(mn,parseFloat(ex.minSpeed)||Infinity);
     });
     document.getElementById('totalDistance').textContent   = totD.toFixed(2);
     document.getElementById('totalDuration').textContent   = (totT/3600).toFixed(2);
