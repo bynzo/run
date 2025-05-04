@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign In &ndash; RunTracker</title>
+  <style>
+    body { display:flex; align-items:center; justify-content:center; height:100vh; font-family:sans-serif; background:#f7f9fc; }
+    #loginBtn { padding:12px 24px; font-size:1.1em; background:#2575fc; color:#fff; border:none; border-radius:6px; cursor:pointer; }
+  </style>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js"></script>
+</head>
+<body>
+  <button id="loginBtn">Sign in with Google</button>
+
+  <script type="module">
+    // TODO: replace the placeholder with your config from Firebase console
+    const firebaseConfig = {
+    apiKey: "AIzaSyCX4vYmL8LIygOgmoE0B9c7FlL2vHJPJmM",
+    authDomain: "runtracker-f372e.firebaseapp.com",
+    projectId: "runtracker-f372e",
+    storageBucket: "runtracker-f372e.firebasestorage.app",
+    messagingSenderId: "144324009143",
+    appId: "1:144324009143:web:6cffe5b2192f6f9aee4132"
+  };
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js';
+    import { getAuth, signInWithPopup, GoogleAuthProvider } from 'https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js';
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const provider = new GoogleAuthProvider();
+
+    document.getElementById('loginBtn').onclick = () => {
+      signInWithPopup(auth, provider)
+        .then(() => window.location.href = 'index.html')
+        .catch(err => alert('Sign‑in error: ' + err.message));
+    };
+  </script>
+</body>
+</html>
