@@ -213,7 +213,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function positionSuccess(pos) {
       const { latitude, longitude, speed, accuracy } = pos.coords;
       const timestamp = pos.timestamp;
-      if (!latitude || !longitude || isNaN(latitude) || accuracy > 20) return;
+      if (!latitude || !longitude || isNaN(latitude) || accuracy > 50) return;
 
       let d = 0, t = 0;
       if (positions.length > 0) {
@@ -230,11 +230,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const prev = positions[positions.length - 1];
         const d = computeDistance(prev.coords.latitude, prev.coords.longitude, latitude, longitude);
         const t = (timestamp - prev.timestamp) / 1000;
-        if (d < 2 || t < 1) return;
+        if (d < 2 || t < 1) return; 
         rawSpeed = d / t;
         totalDistance += d;
       }
-      
+      if (rawSpeed<3) return; //no speed considered < 3 km/h  
+
+      totalDistance += deltaDistance;
+      positions.push({ coords: { latitude, longitude }, timestamp });
+
       speedSamples.push(rawSpeed);
       if (speedSamples.length > 5) speedSamples.shift();
       const smoothed = speedSamples.reduce((a, b) => a + b, 0) / speedSamples.length;
