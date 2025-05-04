@@ -60,6 +60,10 @@ document.addEventListener('visibilitychange', async () => {
   }
 });
 
+const MIN_ACCURACY = 15;
+const MIN_DISTANCE = 3;
+const MIN_TIME     = 3;
+const MIN_SPEED    = 0.5;
 // === COMMON: Service Worker Registration ===
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('service-worker.js', { updateViaCache: 'none' })
@@ -210,45 +214,61 @@ document.addEventListener('DOMContentLoaded', () => {
       alert("Exercise saved!");
     }
 
-    function positionSuccess(pos) {
-      const { latitude, longitude, speed, accuracy } = pos.coords;
-      const timestamp = pos.timestamp;
-      if (!latitude || !longitude || isNaN(latitude) || accuracy > 20) return;
+   function positionSuccess(pos) {
+  const { latitude, longitude, speed, accuracy } = pos.coords;
+  const now = pos.timestamp;
 
-      let d = 0, t = 0;
-      if (positions.length > 0) {
-        const prev = positions[positions.length - 1];
-        d = computeDistance(prev.coords.latitude, prev.coords.longitude, latitude, longitude);
-        t = (timestamp - prev.timestamp) / 1000;
-        totalDistance += d;
-      }
+  // 1) throw out poor‐quality fixes
+  if (accuracy > MIN_ACCURACY) return;
 
-      let rawSpeed = 0;
-      if (speed !== null && !isNaN(speed) && speed > 0) {
-        rawSpeed = speed;
-      } else if (t > 0) {
-        rawSpeed = d / t;
-      }
+  // 2) compute delta‐distance & delta‐time since last point
+  let d = 0, t = 0;
+  if (positions.length > 0) {
+    const prev = positions[positions.length - 1];
+    d = computeDistance(
+      prev.coords.latitude, prev.coords.longitude,
+      latitude, longitude
+    );
+    t = (now - prev.timestamp) / 1000; // seconds
+  }
 
-      speedSamples.push(rawSpeed);
-      if (speedSamples.length > 5) speedSamples.shift();
-      const smoothed = speedSamples.reduce((a, b) => a + b, 0) / speedSamples.length;
-      if (smoothed > 0) {
-        maxSpeed = Math.max(maxSpeed, smoothed);
-        minSpeed = Math.min(minSpeed, smoothed);
-      }
+  // 3) ignore tiny moves or super‐fast updates
+  if (d < MIN_DISTANCE || t < MIN_TIME) return;
 
-      positions.push({ coords: { latitude, longitude }, timestamp });
-      if (polyline) polyline.addLatLng([latitude, longitude]);
-      if (map) map.setView([latitude, longitude], 16);
+  // 4) choose rawSpeed from GPS, or fallback to d/t
+  let rawSpeed = 0;
+  if (speed !== null && !isNaN(speed) && speed > MIN_SPEED) {
+    rawSpeed = speed;
+  } else {
+    rawSpeed = d / t;
+    // still too slow? likely drift—ignore
+    if (rawSpeed < MIN_SPEED) return;
+    totalDistance += d;  // only accumulate after we pass all filters
+  }
 
-      distanceEl.textContent     = (totalDistance / 1000).toFixed(2);
-      currentSpeedEl.textContent = (smoothed * 3.6).toFixed(2);
-      const avg = elapsedTime > 0 ? totalDistance / elapsedTime : 0;
-      avgSpeedEl.textContent     = (avg * 3.6).toFixed(2);
-      maxSpeedEl.textContent     = (maxSpeed * 3.6).toFixed(2);
-      minSpeedEl.textContent     = (minSpeed === Infinity ? 0 : (minSpeed * 3.6).toFixed(2));
-    }
+  // 5) smoothing + stats
+  speedSamples.push(rawSpeed);
+  if (speedSamples.length > 5) speedSamples.shift();
+  const smoothed = speedSamples.reduce((a,b)=>a+b,0) / speedSamples.length;
+  if (smoothed > 0) {
+    maxSpeed = Math.max(maxSpeed, smoothed);
+    minSpeed = Math.min(minSpeed, smoothed);
+  }
+
+  // 6) record the valid point
+  positions.push({ coords:{latitude,longitude}, timestamp: now });
+  if (polyline) polyline.addLatLng([latitude, longitude]);
+  if (map)       map.setView([latitude, longitude], 16);
+
+  // 7) update UI
+  distanceEl.textContent     = (totalDistance/1000).toFixed(2);
+  currentSpeedEl.textContent = ( (smoothed*3.6).toFixed(2) );
+  const avg = elapsedTime > 0 ? totalDistance/elapsedTime : 0;
+  avgSpeedEl.textContent     = (avg*3.6).toFixed(2);
+  maxSpeedEl.textContent     = (maxSpeed*3.6).toFixed(2);
+  minSpeedEl.textContent     = ((minSpeed===Infinity?0:minSpeed)*3.6).toFixed(2);
+}
+
 
     function positionError(err) {
       console.warn(`ERROR(${err.code}): ${err.message}`);
