@@ -2,6 +2,13 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js';
 import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js';
 
+// at the very top of app.js, under your imports
+const MIN_DISTANCE    = 3;      // meters
+const MIN_TIME        = 1;      // seconds
+const MIN_SPEED_KMH   = 3;      // km/h
+const MIN_SPEED       = MIN_SPEED_KMH / 3.6; // ≈0.83 m/s
+const MAX_ACCURACY    = 50;     // meters, bump this if you need
+
 // TODO: replace with your Firebase project’s config
 const firebaseConfig = {
   apiKey: "AIzaSyCX4vYmL8LIygOgmoE0B9c7FlL2vHJPJmM",
@@ -213,51 +220,55 @@ document.addEventListener('DOMContentLoaded', () => {
     function positionSuccess(pos) {
       const { latitude, longitude, speed, accuracy } = pos.coords;
       const timestamp = pos.timestamp;
-      if (!latitude || !longitude || isNaN(latitude) || accuracy > 50) return;
-
-      let d = 0, t = 0;
-      if (positions.length > 0) {
-        const prev = positions[positions.length - 1];
-        d = computeDistance(prev.coords.latitude, prev.coords.longitude, latitude, longitude);
-        t = (timestamp - prev.timestamp) / 1000;
-        totalDistance += d;
+    
+      // sanity checks
+      if (isNaN(latitude) || isNaN(longitude) || accuracy > MAX_ACCURACY) return;
+    
+      // ─── first fix ───
+      if (positions.length === 0) {
+        positions.push({ coords: { latitude, longitude }, timestamp });
+        if (polyline) polyline.addLatLng([latitude, longitude]);
+        if (map)     map.setView([latitude, longitude], 16);
+        return;
       }
-
-      let rawSpeed = 0;
-      if (speed !== null && !isNaN(speed) && speed > 0) {
-        rawSpeed = speed;
-      } else if (positions.length > 0) {
-        const prev = positions[positions.length - 1];
-        const d = computeDistance(prev.coords.latitude, prev.coords.longitude, latitude, longitude);
-        const t = (timestamp - prev.timestamp) / 1000;
-        if (d < 2 || t < 1) return; 
-        rawSpeed = d / t;
-        totalDistance += d;
-      }
-      if (rawSpeed<3) return; //no speed considered < 3 km/h  
-
-      totalDistance += deltaDistance;
+    
+      // ─── compute distance & time since last fix ───
+      const prev = positions[positions.length - 1];
+      const d    = computeDistance(prev.coords.latitude, prev.coords.longitude, latitude, longitude);
+      const t    = (timestamp - prev.timestamp) / 1000;
+      if (d < MIN_DISTANCE || t < MIN_TIME) return;
+    
+      // ─── pick rawSpeed ───
+      const rawSpeed = (speed !== null && !isNaN(speed))
+                         ? speed
+                         : d / t;
+    
+      // ─── speed floor: 3 km/h => 0.83 m/s ───
+      if (rawSpeed < MIN_SPEED) return;
+    
+      // ─── accept this leg ───
+      totalDistance   += d;
       positions.push({ coords: { latitude, longitude }, timestamp });
-
       speedSamples.push(rawSpeed);
       if (speedSamples.length > 5) speedSamples.shift();
+    
+      // ─── update your smoothed/min/max ───
       const smoothed = speedSamples.reduce((a, b) => a + b, 0) / speedSamples.length;
-      if (smoothed > 0) {
-        maxSpeed = Math.max(maxSpeed, smoothed);
-        minSpeed = Math.min(minSpeed, smoothed);
-      }
-
-      positions.push({ coords: { latitude, longitude }, timestamp });
+      maxSpeed = Math.max(maxSpeed, smoothed);
+      minSpeed = Math.min(minSpeed, smoothed);
+    
+      // ─── draw on map ───
       if (polyline) polyline.addLatLng([latitude, longitude]);
-      if (map) map.setView([latitude, longitude], 16);
-
+      if (map)     map.setView([latitude, longitude], 16);
+    
+      // ─── update UI ───
       distanceEl.textContent     = (totalDistance / 1000).toFixed(2);
       currentSpeedEl.textContent = (smoothed * 3.6).toFixed(2);
       const avg = elapsedTime > 0 ? totalDistance / elapsedTime : 0;
       avgSpeedEl.textContent     = (avg * 3.6).toFixed(2);
       maxSpeedEl.textContent     = (maxSpeed * 3.6).toFixed(2);
       minSpeedEl.textContent     = (minSpeed === Infinity ? 0 : (minSpeed * 3.6).toFixed(2));
-    }
+    }    
 
     function positionError(err) {
       console.warn(`ERROR(${err.code}): ${err.message}`);
