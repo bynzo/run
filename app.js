@@ -2,14 +2,14 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js';
 import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js';
 
-// at the very top of app.js, under your imports
+// ─── Threshold constants ───
 const MIN_DISTANCE    = 3;      // meters
 const MIN_TIME        = 1;      // seconds
 const MIN_SPEED_KMH   = 3;      // km/h
 const MIN_SPEED       = MIN_SPEED_KMH / 3.6; // ≈0.83 m/s
-const MAX_ACCURACY    = 50;     // meters, bump this if you need
+const MAX_ACCURACY    = 50;     // meters
 
-// TODO: replace with your Firebase project’s config
+// ─── Your Firebase project’s config ───
 const firebaseConfig = {
   apiKey: "AIzaSyCX4vYmL8LIygOgmoE0B9c7FlL2vHJPJmM",
   authDomain: "runtracker-f372e.firebaseapp.com",
@@ -18,56 +18,41 @@ const firebaseConfig = {
   messagingSenderId: "144324009143",
   appId: "1:144324009143:web:6cffe5b2192f6f9aee4132"
 };
-
 const fbApp = initializeApp(firebaseConfig);
 const auth  = getAuth(fbApp);
-
 // Redirect to login if not signed in
 onAuthStateChanged(auth, user => {
-  if (!user) {
-    window.location.href = 'login.html';
-  }
+  if (!user) window.location.href = 'login.html';
 });
-
-// Expose sign-out (call from your login page if needed)
-window.doSignOut = () => {
-  signOut(auth).then(() => {
-    window.location.href = 'login.html';
-  });
-};
-
+// Expose sign-out
+window.doSignOut = () => signOut(auth).then(() => window.location.href = 'login.html');
 
 // === SCREEN WAKE LOCK LOGIC ===
 let wakeLock = null;
-
 async function requestWakeLock() {
   try {
     if ('wakeLock' in navigator) {
       wakeLock = await navigator.wakeLock.request('screen');
-      wakeLock.addEventListener('release', () => {
-        console.log('Screen Wake Lock released');
-      });
+      wakeLock.addEventListener('release', () => console.log('Screen Wake Lock released'));
       console.log('Screen Wake Lock acquired');
     }
   } catch (err) {
     console.error('Wake Lock request failed:', err);
   }
 }
-
 async function releaseWakeLock() {
   if (wakeLock) {
     await wakeLock.release();
     wakeLock = null;
   }
 }
-
 document.addEventListener('visibilitychange', async () => {
   if (wakeLock !== null && document.visibilityState === 'visible') {
     await requestWakeLock();
   }
 });
 
-// === COMMON: Service Worker Registration ===
+// === SERVICE WORKER REGISTRATION ===
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('service-worker.js', { updateViaCache: 'none' })
     .then(reg => {
@@ -106,39 +91,42 @@ document.addEventListener('DOMContentLoaded', () => {
     let selectedExerciseType = null,
         currentWeather = null,
         running = false,
-        timerInterval, startTime, elapsedTime = 0,
-        positions = [], watchId,
+        timerInterval,
+        startTime,
+        elapsedTime = 0,
+        positions = [],
+        watchId,
         map, polyline,
         totalDistance = 0,
-        speedSamples = [], maxSpeed = 0, minSpeed = Infinity,
-        distanceEl = document.getElementById('distance'),
-        currentSpeedEl = document.getElementById('currentSpeed'),
-        avgSpeedEl = document.getElementById('avgSpeed'),
-        maxSpeedEl = document.getElementById('maxSpeed'),
-        minSpeedEl = document.getElementById('minSpeed'),
-        timerEl = document.getElementById('timer'),
-        btn = document.getElementById('startStopBtn');
+        speedSamples = [],
+        maxSpeed = 0,
+        minSpeed = Infinity;
+
+    const distanceEl     = document.getElementById('distance');
+    const currentSpeedEl = document.getElementById('currentSpeed');
+    const timerEl        = document.getElementById('timer');
+    const btn            = document.getElementById('startStopBtn');
 
     document.getElementById('exerciseDropdown').addEventListener('change', e => {
       selectedExerciseType = e.target.value;
     });
 
     function fetchWeather(lat, lon) {
-      if (!lat || !lon || isNaN(lat) || isNaN(lon)) return;
+      if (!lat||!lon||isNaN(lat)||isNaN(lon)) return;
       fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`)
         .then(res => res.json())
         .then(data => {
           if (data.current_weather) {
             const code = data.current_weather.weathercode;
-            const desc = code === 0 ? "Clear"
-                       : [1, 2, 3].includes(code) ? "Partly Cloudy"
-                       : [45, 48].includes(code) ? "Fog"
-                       : [51, 53, 55].includes(code) ? "Drizzle"
-                       : [61, 63, 65].includes(code) ? "Rain"
-                       : [66, 67].includes(code) ? "Freezing Rain"
-                       : [71, 73, 75].includes(code) ? "Snow"
-                       : code === 80 ? "Rain Showers"
-                       : code === 95 ? "Thunderstorm"
+            const desc = code === 0   ? "Clear"
+                       : [1,2,3].includes(code) ? "Partly Cloudy"
+                       : [45,48].includes(code)  ? "Fog"
+                       : [51,53,55].includes(code)? "Drizzle"
+                       : [61,63,65].includes(code)? "Rain"
+                       : [66,67].includes(code)   ? "Freezing Rain"
+                       : [71,73,75].includes(code)? "Snow"
+                       : code === 80               ? "Rain Showers"
+                       : code === 95               ? "Thunderstorm"
                        : "Unknown";
             currentWeather = {
               temperature: data.current_weather.temperature,
@@ -151,9 +139,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updateTimer() {
       elapsedTime = Math.floor((Date.now() - startTime) / 1000);
-      const hrs = String(Math.floor(elapsedTime / 3600)).padStart(2, '0'),
-            mins = String(Math.floor((elapsedTime % 3600) / 60)).padStart(2, '0'),
-            secs = String(elapsedTime % 60).padStart(2, '0');
+      const hrs  = String(Math.floor(elapsedTime/3600)).padStart(2,'0'),
+            mins = String(Math.floor((elapsedTime%3600)/60)).padStart(2,'0'),
+            secs = String(elapsedTime%60).padStart(2,'0');
       timerEl.textContent = `${hrs}:${mins}:${secs}`;
     }
 
@@ -161,10 +149,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const R = 6371e3,
             φ1 = lat1 * Math.PI/180,
             φ2 = lat2 * Math.PI/180,
-            Δφ = (lat2 - lat1) * Math.PI/180,
-            Δλ = (lon2 - lon1) * Math.PI/180,
-            a = Math.sin(Δφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2,
-            c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            Δφ = (lat2-lat1)*Math.PI/180,
+            Δλ = (lon2-lon1)*Math.PI/180,
+            a  = Math.sin(Δφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2,
+            c  = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
       return R * c;
     }
 
@@ -200,19 +188,20 @@ document.addEventListener('DOMContentLoaded', () => {
       btn.textContent = "Start";
       await releaseWakeLock();
 
-      const exercise = {
+      const avg = elapsedTime > 0 ? (totalDistance/elapsedTime)*3.6 : 0;
+      const ex  = {
         date: new Date(startTime).toLocaleString(),
         duration: elapsedTime,
         distance: (totalDistance / 1000).toFixed(2),
-        avgSpeed: ((totalDistance / elapsedTime) * 3.6).toFixed(2),
-        maxSpeed: maxSpeed.toFixed(2),
-        minSpeed: (minSpeed === Infinity ? 0 : minSpeed.toFixed(2)),
+        avgSpeed: avg.toFixed(2),
+        maxSpeed: (maxSpeed*3.6).toFixed(2),
+        minSpeed: ((minSpeed===Infinity?0:minSpeed)*3.6).toFixed(2),
         positions,
         exerciseType: selectedExerciseType,
         weather: currentWeather
       };
-      const all = JSON.parse(localStorage.getItem('exercises') || '[]');
-      all.push(exercise);
+      const all = JSON.parse(localStorage.getItem('exercises')||'[]');
+      all.push(ex);
       localStorage.setItem('exercises', JSON.stringify(all));
       alert("Exercise saved!");
     }
@@ -220,55 +209,46 @@ document.addEventListener('DOMContentLoaded', () => {
     function positionSuccess(pos) {
       const { latitude, longitude, speed, accuracy } = pos.coords;
       const timestamp = pos.timestamp;
-    
+
       // sanity checks
-      if (isNaN(latitude) || isNaN(longitude) || accuracy > MAX_ACCURACY) return;
-    
-      // ─── first fix ───
+      if (isNaN(latitude)||isNaN(longitude)||accuracy > MAX_ACCURACY) return;
+
+      // first fix: just register starting point
       if (positions.length === 0) {
-        positions.push({ coords: { latitude, longitude }, timestamp });
+        positions.push({ coords:{latitude,longitude}, timestamp });
         if (polyline) polyline.addLatLng([latitude, longitude]);
         if (map)     map.setView([latitude, longitude], 16);
         return;
       }
-    
-      // ─── compute distance & time since last fix ───
-      const prev = positions[positions.length - 1];
+
+      // compute leg distance & time
+      const prev = positions[positions.length-1];
       const d    = computeDistance(prev.coords.latitude, prev.coords.longitude, latitude, longitude);
-      const t    = (timestamp - prev.timestamp) / 1000;
+      const t    = (timestamp - prev.timestamp)/1000;
       if (d < MIN_DISTANCE || t < MIN_TIME) return;
-    
-      // ─── pick rawSpeed ───
-      const rawSpeed = (speed !== null && !isNaN(speed))
-                         ? speed
-                         : d / t;
-    
-      // ─── speed floor: 3 km/h => 0.83 m/s ───
+
+      // pick rawSpeed
+      const rawSpeed = (speed!==null && !isNaN(speed)) ? speed : d/t;
       if (rawSpeed < MIN_SPEED) return;
-    
-      // ─── accept this leg ───
-      totalDistance   += d;
-      positions.push({ coords: { latitude, longitude }, timestamp });
+
+      // accept leg
+      totalDistance += d;
+      positions.push({ coords:{latitude,longitude}, timestamp });
       speedSamples.push(rawSpeed);
       if (speedSamples.length > 5) speedSamples.shift();
-    
-      // ─── update your smoothed/min/max ───
-      const smoothed = speedSamples.reduce((a, b) => a + b, 0) / speedSamples.length;
-      maxSpeed = Math.max(maxSpeed, smoothed);
-      minSpeed = Math.min(minSpeed, smoothed);
-    
-      // ─── draw on map ───
+
+      // update smoothing & bounds
+      const sm = speedSamples.reduce((a,b)=>a+b,0)/speedSamples.length;
+      maxSpeed = Math.max(maxSpeed, sm);
+      minSpeed = Math.min(minSpeed, sm);
+
+      // draw & update UI
       if (polyline) polyline.addLatLng([latitude, longitude]);
       if (map)     map.setView([latitude, longitude], 16);
-    
-      // ─── update UI ───
+
       distanceEl.textContent     = (totalDistance / 1000).toFixed(2);
-      currentSpeedEl.textContent = (smoothed * 3.6).toFixed(2);
-      const avg = elapsedTime > 0 ? totalDistance / elapsedTime : 0;
-      avgSpeedEl.textContent     = (avg * 3.6).toFixed(2);
-      maxSpeedEl.textContent     = (maxSpeed * 3.6).toFixed(2);
-      minSpeedEl.textContent     = (minSpeed === Infinity ? 0 : (minSpeed * 3.6).toFixed(2));
-    }    
+      currentSpeedEl.textContent = (sm * 3.6).toFixed(2);
+    }
 
     function positionError(err) {
       console.warn(`ERROR(${err.code}): ${err.message}`);
@@ -277,164 +257,137 @@ document.addEventListener('DOMContentLoaded', () => {
     btn.addEventListener('click', () => running ? stopRunning() : startRunning());
 
     window.onload = () => {
-      map = L.map('map').setView([0, 0], 2);
+      map = L.map('map').setView([0,0],2);
       L.tileLayer('https://mt1.google.com/vt/lyrs=r&x={x}&y={y}&z={z}', {
         attribution: '© Google Maps', maxZoom: 20
       }).addTo(map);
-      polyline = L.polyline([], { color: 'red', weight: 5 }).addTo(map);
+      polyline = L.polyline([], { color:'red', weight:5 }).addTo(map);
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(p => {
           const lat = p.coords.latitude, lng = p.coords.longitude;
-          if (!isNaN(lat) && !isNaN(lng)) {
-            map.setView([lat, lng], 16);
-            L.marker([lat, lng]).addTo(map).bindPopup("You are here").openPopup();
+          if (!isNaN(lat)&&!isNaN(lng)) {
+            map.setView([lat,lng],16);
+            L.marker([lat,lng]).addTo(map).bindPopup("You are here").openPopup();
           }
         });
       }
     };
   }
 
-  // === HISTORY PAGE LOGIC (CARD STYLE + DELETE) ===
-  if (document.getElementById('historyList')) {
-    const exercises = JSON.parse(localStorage.getItem('exercises') || '[]');
-    const container = document.getElementById('historyList');
-    exercises.forEach((ex, i) => {
-      const card = document.createElement('div');
-      card.className = 'exercise-card';
-      card.innerHTML = `
-        <div class="card-header">
-          <div class="card-date">${ex.date}</div>
-          <div class="card-actions">
-            <button class="map-btn" data-index="${i}" title="View Map">📍</button>
-            <button class="delete-btn" data-index="${i}" title="Delete">🗑️</button>
-          </div>
-        </div>
-        <div class="card-body">
-          <p><strong>Duration:</strong> ${ex.duration} s</p>
-          <p><strong>Distance:</strong> ${ex.distance} km</p>
-          <p><strong>Avg Speed:</strong> ${ex.avgSpeed} km/h</p>
-          <p><strong>Max Speed:</strong> ${ex.maxSpeed} km/h</p>
-          <p><strong>Min Speed:</strong> ${ex.minSpeed} km/h</p>
-          <p><strong>Type:</strong> ${ex.exerciseType || 'N/A'}</p>
-          <p><strong>Weather:</strong> ${ex.weather ? `${ex.weather.description}, ${ex.weather.temperature}°C` : 'N/A'}</p>
-        </div>
+  // === HISTORY PAGE LOGIC ===
+  if (document.querySelector('#exercisesTable')) {
+    const exercises = JSON.parse(localStorage.getItem('exercises')||'[]');
+    const tbody     = document.querySelector('#exercisesTable tbody');
+
+    exercises.forEach((ex,i) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${ex.date}</td>
+        <td>${ex.duration}</td>
+        <td>${ex.distance}</td>
+        <td>${ex.avgSpeed}</td>
+        <td>${ex.maxSpeed}</td>
+        <td>${ex.minSpeed}</td>
+        <td>${ex.exerciseType||'N/A'}</td>
+        <td>${ex.weather?`${ex.weather.description}, ${ex.weather.temperature}°C`:'N/A'}</td>
+        <td><button class="nav-button" onclick="viewRoute(${i})">View</button></td>
       `;
-      container.appendChild(card);
+      tbody.appendChild(tr);
     });
 
-    container.addEventListener('click', e => {
-      if (e.target.matches('.delete-btn')) {
-        const idx = parseInt(e.target.dataset.index);
-        if (confirm('Delete this exercise?')) {
-          exercises.splice(idx, 1);
-          localStorage.setItem('exercises', JSON.stringify(exercises));
-          container.innerHTML = '';
-          // re-render:
-          exercises.forEach((ex, i) => {
-            // same card creation code as above...
-            const card = document.createElement('div');
-            card.className = 'exercise-card';
-            card.innerHTML = `
-              <div class="card-header">
-                <div class="card-date">${ex.date}</div>
-                <div class="card-actions">
-                  <button class="map-btn" data-index="${i}" title="View Map">📍</button>
-                  <button class="delete-btn" data-index="${i}" title="Delete">🗑️</button>
-                </div>
-              </div>
-              <div class="card-body">
-                <p><strong>Duration:</strong> ${ex.duration} s</p>
-                <p><strong>Distance:</strong> ${ex.distance} km</p>
-                <p><strong>Avg Speed:</strong> ${ex.avgSpeed} km/h</p>
-                <p><strong>Max Speed:</strong> ${ex.maxSpeed} km/h</p>
-                <p><strong>Min Speed:</strong> ${ex.minSpeed} km/h</p>
-                <p><strong>Type:</strong> ${ex.exerciseType || 'N/A'}</p>
-                <p><strong>Weather:</strong> ${ex.weather ? `${ex.weather.description}, ${ex.weather.temperature}°C` : 'N/A'}</p>
-              </div>
-            `;
-            container.appendChild(card);
-          });
-        }
-      }
-      if (e.target.matches('.map-btn')) {
-        viewRoute(parseInt(e.target.dataset.index));
-      }
-    });
+    window.viewRoute = index => {
+      const ex = exercises[index];
+      if (!ex?.positions?.length) return alert("No route data available.");
+      document.getElementById('routeView').style.display = 'block';
+
+      const mapDiv = document.getElementById('map');
+      mapDiv.innerHTML = '';
+      if (mapDiv._leaflet_id) mapDiv._leaflet_id = null;
+
+      const routeMap = L.map('map').setView([0,0],13);
+      L.tileLayer('https://mt1.google.com/vt/lyrs=r&x={x}&y={y}&z={z}', {
+        attribution:'© Google Maps', maxZoom:20
+      }).addTo(routeMap);
+
+      const latlngs = ex.positions.map(p=>[p.coords.latitude,p.coords.longitude]);
+      const poly   = L.polyline(latlngs,{color:'red'}).addTo(routeMap);
+      L.marker(latlngs[0]).addTo(routeMap).bindPopup("Start");
+      L.marker(latlngs[latlngs.length-1]).addTo(routeMap).bindPopup("Finish");
+      routeMap.fitBounds(poly.getBounds());
+    };
+
+    window.closeRoute = () => {
+      document.getElementById('routeView').style.display = 'none';
+    };
   }
 
-   // === VIEW ROUTE & CLOSE ===
-   window.viewRoute = index => {
-    const exercises = JSON.parse(localStorage.getItem('exercises') || '[]');
-    const ex = exercises[index];
-    if (!ex || !ex.positions || !ex.positions.length) return alert("No route data available.");
-    document.getElementById('routeView').style.display = 'block';
-    const mapDiv = document.getElementById('map');
-    mapDiv.innerHTML = '';
-    if (mapDiv._leaflet_id) mapDiv._leaflet_id = null;
-    const map = L.map('map').setView([0, 0], 13);
-    L.tileLayer('https://mt1.google.com/vt/lyrs=r&x={x}&y={y}&z={z}', {
-      attribution: '© Google Maps', maxZoom: 20
-    }).addTo(map);
-    const latlngs = ex.positions.map(p => [p.coords.latitude, p.coords.longitude]);
-    const poly = L.polyline(latlngs, { color: 'red' }).addTo(map);
-    L.marker(latlngs[0]).addTo(map).bindPopup("Start");
-    L.marker(latlngs.slice(-1)[0]).addTo(map).bindPopup("Finish");
-    map.fitBounds(poly.getBounds());
-  };
-  window.closeRoute = () => {
-    document.getElementById('routeView').style.display = 'none';
-  };
-  
   // === STATS PAGE LOGIC ===
   if (document.getElementById('durationChart')) {
-    const exercises = JSON.parse(localStorage.getItem('exercises') || '[]');
-    const durationCtx = document.getElementById('durationChart').getContext('2d');
-    const distanceCtx = document.getElementById('distanceChart').getContext('2d');
+    const exercises    = JSON.parse(localStorage.getItem('exercises')||'[]');
+    const durationCtx  = document.getElementById('durationChart').getContext('2d');
+    const distanceCtx  = document.getElementById('distanceChart').getContext('2d');
     let durationChart, distanceChart;
-    const chartModes = { duration: 'week', distance: 'week' };
+    const chartModes = { duration:'week', distance:'week' };
 
     function parseKey(dateStr) {
       const m = dateStr.match(/^(\d{4}-\d{2}-\d{2})/);
       return m ? m[1] : 'Unknown';
     }
+
     function renderChart(type, mode) {
       const now = new Date();
       let start, end;
-      if (mode === 'week') {
-        const d = now.getDay(), diff = (d === 0 ? -6 : 1) - d;
-        start = new Date(now); start.setDate(now.getDate() + diff); start.setHours(0, 0, 0, 0);
-        end   = new Date(start); end.setDate(start.getDate() + 6);
+      if (mode==='week') {
+        const d    = now.getDay(),
+              diff = (d===0?-6:1)-d;
+        start = new Date(now); start.setDate(now.getDate()+diff); start.setHours(0,0,0,0);
+        end   = new Date(start); end.setDate(start.getDate()+6);
       } else {
-        start = new Date(now.getFullYear(), now.getMonth(), 1);
-        end   = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        start = new Date(now.getFullYear(), now.getMonth(),1);
+        end   = new Date(now.getFullYear(), now.getMonth()+1,0);
       }
-      const labels = [], mapData = {};
-      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-        const lbl = d.toLocaleDateString(undefined, { year:'numeric', month:'short', day:'numeric' });
-        labels.push(lbl); mapData[lbl] = {};
+
+      const labels = [], map = {};
+      for (let dt = new Date(start); dt <= end; dt.setDate(dt.getDate()+1)) {
+        const lbl = dt.toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'});
+        labels.push(lbl);
+        map[lbl] = {};
       }
+
       exercises.forEach(ex => {
-        const key = new Date(parseKey(ex.date)).toLocaleDateString(undefined, { year:'numeric', month:'short', day:'numeric' });
-        const val = type === 'duration' ? parseFloat(ex.duration)/3600 : parseFloat(ex.distance);
-        mapData[key] = mapData[key] || {};
-        mapData[key][ex.exerciseType || 'Unknown'] = (mapData[key][ex.exerciseType||'Unknown']||0) + val;
+        const key = new Date(parseKey(ex.date))
+                      .toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'});
+        const val = type==='duration'
+                    ? (parseFloat(ex.duration)||0)/3600
+                    : parseFloat(ex.distance)||0;
+        map[key] = map[key]||{};
+        map[key][ex.exerciseType||'Unknown'] = (map[key][ex.exerciseType||'Unknown']||0) + val;
       });
+
       const allTypes = new Set();
-      Object.values(mapData).forEach(o => Object.keys(o).forEach(t => allTypes.add(t)));
+      Object.values(map).forEach(o => Object.keys(o).forEach(t => allTypes.add(t)));
+
       const datasets = Array.from(allTypes).map(t => ({
         label: t,
-        data: labels.map(l => mapData[l][t] || 0),
-        backgroundColor: '#' + Math.floor(Math.random() * 16777215).toString(16)
+        data: labels.map(l => map[l][t]||0),
+        backgroundColor: '#' + Math.floor(Math.random()*16777215).toString(16)
       }));
+
       const cfg = {
         type: 'bar',
         data: { labels, datasets },
         options: {
           responsive: true,
-          plugins: { title: { display: true, text: `${type==='duration'?'Duration (hrs)':'Distance (km)'} by ${mode}` } },
-          scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } }
+          plugins: {
+            title: { display: true, text: `${type==='duration'?'Duration (hrs)':'Distance (km)'} by ${mode}` }
+          },
+          scales: {
+            x: { stacked: true },
+            y: { stacked: true, beginAtZero: true }
+          }
         }
       };
+
       if (type==='duration') {
         durationChart?.destroy();
         durationChart = new Chart(durationCtx, cfg);
@@ -445,32 +398,34 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     document.getElementById('durationToggleBtn').onclick = () => {
-      chartModes.duration = chartModes.duration === 'week' ? 'month' : 'week';
-      document.getElementById('durationToggleBtn').textContent = chartModes.duration === 'week' ? 'Week View' : 'Month View';
+      chartModes.duration = chartModes.duration==='week'?'month':'week';
+      document.getElementById('durationToggleBtn').textContent = chartModes.duration==='week'?'Week View':'Month View';
       renderChart('duration', chartModes.duration);
     };
     document.getElementById('distanceToggleBtn').onclick = () => {
-      chartModes.distance = chartModes.distance === 'week' ? 'month' : 'week';
-      document.getElementById('distanceToggleBtn').textContent = chartModes.distance === 'week' ? 'Week View' : 'Month View';
+      chartModes.distance = chartModes.distance==='week'?'month':'week';
+      document.getElementById('distanceToggleBtn').textContent = chartModes.distance==='week'?'Week View':'Month View';
       renderChart('distance', chartModes.distance);
     };
 
     // summary stats
     document.getElementById('totalRuns').textContent = exercises.length;
-    let totD = 0, totT = 0, totS = 0, max = 0, min = Infinity;
+    let totD=0, totT=0, totS=0, mx=0, mn=Infinity;
     exercises.forEach(ex => {
-      const d = parseFloat(ex.distance),
-            t = parseFloat(ex.duration),
+      const d = parseFloat(ex.distance)||0,
+            t = parseFloat(ex.duration)||0,
             s = (d/t)*3.6;
-      totD += d; totT += t; totS += s;
-      max = Math.max(max, parseFloat(ex.maxSpeed));
-      min = Math.min(min, parseFloat(ex.minSpeed));
+      totD += d;
+      totT += t;
+      totS += s;
+      mx = Math.max(mx, parseFloat(ex.maxSpeed)||0);
+      mn = Math.min(mn, parseFloat(ex.minSpeed)||Infinity);
     });
-    document.getElementById('totalDistance').textContent    = totD.toFixed(2);
-    document.getElementById('totalDuration').textContent    = (totT/3600).toFixed(2);
-    document.getElementById('averageSpeed').textContent     = (totS/exercises.length).toFixed(2);
-    document.getElementById('maxSpeedOverall').textContent  = max.toFixed(2);
-    document.getElementById('minSpeedOverall').textContent  = min.toFixed(2);
+    document.getElementById('totalDistance').textContent   = totD.toFixed(2);
+    document.getElementById('totalDuration').textContent   = (totT/3600).toFixed(2);
+    document.getElementById('averageSpeed').textContent    = (totS/exercises.length).toFixed(2);
+    document.getElementById('maxSpeedOverall').textContent = mx.toFixed(2);
+    document.getElementById('minSpeedOverall').textContent = (mn===Infinity?0:mn).toFixed(2);
 
     renderChart('duration','week');
     renderChart('distance','week');
