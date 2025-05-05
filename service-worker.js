@@ -1,10 +1,10 @@
 // service-worker.js
-const CACHE_NAME = 'runtracker-cache-v5';  // ← bump this on each release
+const CACHE_NAME = 'runtracker-cache-v6';  // bumped on each release
 const urlsToCache = [
   'index.html',
-  'login.html',
   'history.html',
   'stats.html',
+  'settings.html',      // new settings page
   'manifest.json',
   'app.js',
   'styles.css',
@@ -17,6 +17,7 @@ const urlsToCache = [
 ];
 
 self.addEventListener('install', event => {
+  // immediately activate this version
   self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME)
@@ -25,14 +26,14 @@ self.addEventListener('install', event => {
 });
 
 self.addEventListener('activate', event => {
+  // remove any old caches
   event.waitUntil(
-    caches.keys()
-      .then(keys =>
-        Promise.all(
-          keys.map(key => key !== CACHE_NAME ? caches.delete(key) : null)
-        )
+    caches.keys().then(keys =>
+      Promise.all(
+        keys.filter(key => key !== CACHE_NAME)
+            .map(key => caches.delete(key))
       )
-      .then(() => self.clients.claim())
+    ).then(() => self.clients.claim())
   );
 });
 
@@ -46,18 +47,15 @@ self.addEventListener('fetch', event => {
   event.respondWith(
     fetch(event.request)
       .then(networkRes => {
-        // clone the response before it's consumed
-        const responseClone = networkRes.clone();
-        // update cache in the background and keep the SW alive
+        // update cache in background
+        const clone = networkRes.clone();
         event.waitUntil(
-          caches.open(CACHE_NAME)
-            .then(cache => cache.put(event.request, responseClone))
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone))
         );
-        // return the original network response to the page
         return networkRes;
       })
       .catch(() => {
-        // on failure, try to serve from cache
+        // on failure, serve from cache if available
         return caches.match(event.request);
       })
   );

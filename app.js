@@ -21,9 +21,9 @@ const firebaseConfig = {
 const fbApp = initializeApp(firebaseConfig);
 const auth  = getAuth(fbApp);
 onAuthStateChanged(auth, user => {
-  if (!user) window.location.href = 'login.html';
+  if (!user) window.location.href = 'settings.html';
 });
-window.doSignOut = () => signOut(auth).then(() => window.location.href = 'login.html');
+window.doSignOut = () => signOut(auth).then(() => window.location.href = 'settings.html');
 
 // === SCREEN WAKE LOCK LOGIC ===
 let wakeLock = null;
@@ -158,7 +158,14 @@ document.addEventListener('DOMContentLoaded', () => {
         alert("Please select an exercise type before starting.");
         return;
       }
+    
+      // 1. Hide the header for full-screen timer/map
+      document.querySelector('header').style.display = 'none';
+    
+      // 2. Acquire wake lock
       await requestWakeLock();
+    
+      // 3. Initialize run state
       running       = true;
       startTime     = Date.now();
       elapsedTime   = 0;
@@ -167,26 +174,49 @@ document.addEventListener('DOMContentLoaded', () => {
       maxSpeed      = 0;
       minSpeed      = Infinity;
       speedSamples  = [];
+    
+      // 4. Start timer display
       timerInterval = setInterval(updateTimer, 1000);
-      btn.textContent = "Stop";
-
+    
+      // 5. Switch button to STOP and color it red
+      btn.textContent              = "Stop";
+      btn.style.backgroundColor    = "red";
+    
+      // 6. Begin geolocation tracking & initial weather fetch
       if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(p => fetchWeather(p.coords.latitude, p.coords.longitude));
-        watchId = navigator.geolocation.watchPosition(positionSuccess, positionError, { enableHighAccuracy: true });
+        navigator.geolocation.getCurrentPosition(
+          p => fetchWeather(p.coords.latitude, p.coords.longitude)
+        );
+        watchId = navigator.geolocation.watchPosition(
+          positionSuccess,
+          positionError,
+          { enableHighAccuracy: true }
+        );
       } else {
         alert("Geolocation not supported.");
       }
     }
 
     async function stopRunning() {
+      // 1. Flip running flag & clear the timer/watch
       running = false;
       clearInterval(timerInterval);
       navigator.geolocation.clearWatch(watchId);
-      btn.textContent = "Start";
+    
+      // 2. Show the header again
+      document.querySelector('header').style.display = '';
+    
+      // 3. Reset button back to Start (and clear inline red color)
+      btn.textContent           = "Start";
+      btn.style.backgroundColor = "";
+    
+      // 4. Release wake lock
       await releaseWakeLock();
-
+    
+      // 5. Build the exercise record
       const avg = elapsedTime > 0 ? (totalDistance/elapsedTime)*3.6 : 0;
       const ex  = {
+        timestamp:    startTime,
         date:         new Date(startTime).toLocaleString(),
         duration:     elapsedTime,
         distance:     (totalDistance/1000).toFixed(2),
@@ -197,10 +227,14 @@ document.addEventListener('DOMContentLoaded', () => {
         exerciseType: selectedExerciseType,
         weather:      currentWeather
       };
-      const all = JSON.parse(localStorage.getItem('exercises')||'[]');
+    
+      // 6. Save it
+      const all = JSON.parse(localStorage.getItem('exercises') || '[]');
       all.push(ex);
       localStorage.setItem('exercises', JSON.stringify(all));
-      alert("Exercise saved!");
+    
+      // 7. Instead of alert(), show our custom modal
+      document.getElementById('savedModal').style.display = 'flex';
     }
 
     function positionSuccess(pos) {
@@ -263,54 +297,62 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }
 
-  // === HISTORY PAGE LOGIC ===
-  if (document.getElementById('historyList')) {
-    const exercises = JSON.parse(localStorage.getItem('exercises')||'[]');
-    const container = document.getElementById('historyList');
+// === HISTORY PAGE LOGIC ===
+if (document.getElementById('historyList')) {
+  // 1. Load exercises & reverse so newest (last‐pushed) come first
+  let exercises = JSON.parse(localStorage.getItem('exercises') || '[]')
+    .reverse();
 
-    function renderHistory() {
-      container.innerHTML = '';
-      exercises.forEach((ex,i) => {
-        const card = document.createElement('div');
-        const durationMin = (ex.duration / 60).toFixed(2);
-        card.className = 'exercise-card';
-        card.innerHTML = `
-          <div class="card-header">
-            <div class="card-date">${ex.date}</div>
-            <div class="card-actions">
-              <button class="map-btn" data-index="${i}" title="View Map">📍</button>
-              <button class="delete-btn" data-index="${i}" title="Delete">🗑️</button>
-            </div>
+  const container = document.getElementById('historyList');
+
+  // 2. Render cards
+  function renderHistory() {
+    container.innerHTML = '';
+    exercises.forEach((ex, i) => {
+      const card = document.createElement('div');
+      card.className = 'exercise-card';
+      const durationMin = (ex.duration / 60).toFixed(2);
+      card.innerHTML = `
+        <div class="card-header">
+          <div class="card-date">${ex.date}</div>
+          <div class="card-actions">
+            <button class="map-btn" data-index="${i}" title="View Map">📍</button>
+            <button class="delete-btn" data-index="${i}" title="Delete">🗑️</button>
           </div>
-          <div class="card-body">
-            <p><strong>Duration:</strong> ${durationMin} min</p>
-            <p><strong>Distance:</strong> ${ex.distance} km</p>
-            <p><strong>Avg Speed:</strong> ${ex.avgSpeed} km/h</p>
-            <p><strong>Max Speed:</strong> ${ex.maxSpeed} km/h</p>
-            <p><strong>Min Speed:</strong> ${ex.minSpeed} km/h</p>
-            <p><strong>Type:</strong> ${ex.exerciseType||'N/A'}</p>
-            <p><strong>Weather:</strong> ${ex.weather?ex.weather.description+', '+ex.weather.temperature+'°C':'N/A'}</p>
-          </div>`;
-        container.appendChild(card);
-      });
-    }
-
-    renderHistory();
-
-    container.addEventListener('click', e => {
-      if (e.target.matches('.delete-btn')) {
-        const idx = +e.target.dataset.index;
-        if (confirm('Delete this exercise?')) {
-          exercises.splice(idx,1);
-          localStorage.setItem('exercises',JSON.stringify(exercises));
-          renderHistory();
-        }
-      }
-      if (e.target.matches('.map-btn')) {
-        viewRoute(+e.target.dataset.index);
-      }
+        </div>
+        <div class="card-body">
+          <p><strong>Duration:</strong> ${durationMin} min</p>
+          <p><strong>Distance:</strong> ${ex.distance} km</p>
+          <p><strong>Avg Speed:</strong> ${ex.avgSpeed} km/h</p>
+          <p><strong>Max Speed:</strong> ${ex.maxSpeed} km/h</p>
+          <p><strong>Min Speed:</strong> ${ex.minSpeed} km/h</p>
+          <p><strong>Type:</strong> ${ex.exerciseType || 'N/A'}</p>
+          <p><strong>Weather:</strong> ${
+            ex.weather
+              ? `${ex.weather.description}, ${ex.weather.temperature}°C`
+              : 'N/A'
+          }</p>
+        </div>`;
+      container.appendChild(card);
     });
   }
+
+  renderHistory();
+
+  // 3. Handle delete & map-btn clicks
+  container.addEventListener('click', (e) => {
+    if (e.target.matches('.delete-btn')) {
+      const idx = Number(e.target.dataset.index);
+      if (confirm('Delete this exercise?')) {
+        exercises.splice(idx, 1);
+        localStorage.setItem('exercises', JSON.stringify(exercises.reverse().reverse()));
+        renderHistory();
+      }
+    } else if (e.target.matches('.map-btn')) {
+      viewRoute(Number(e.target.dataset.index));
+    }
+  });
+}
 
   // === VIEW ROUTE & CLOSE ===
   window.viewRoute = index => {
@@ -445,4 +487,8 @@ document.addEventListener('DOMContentLoaded', () => {
     renderChart('duration','week');
     renderChart('distance','week');
   }
+  document.getElementById('closeModal').addEventListener('click', () => {
+    document.getElementById('savedModal').style.display = 'none';
+    window.location.reload();  // clears timer, map, etc.
+  })
 });

@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Running Tracker – Settings</title>
+  <link rel="manifest" href="manifest.json">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <h1>Settings</h1>
+    <div class="header-nav">
+      <a href="index.html" title="Tracker">🏃</a>
+      <a href="history.html" title="History">📃</a>
+      <a href="stats.html" title="Stats">📊</a>
+      <a href="settings.html" class="active" title="Settings">⚙️</a>
+    </div>
+  </header>
+
+  <main id="settingsMain">
+    <div class="auth-info">
+      <p id="userEmail">Not signed in</p>
+    </div>
+    <div class="auth-buttons">
+      <button id="signInBtn">Sign In with Google</button>
+      <button id="signOutBtn" style="display:none;">Sign Out</button>
+    </div>
+  </main>
+
+  <!-- Firebase SDKs -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
+    import {
+      getAuth,
+      onAuthStateChanged,
+      signInWithPopup,
+      GoogleAuthProvider,
+      signOut
+    } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
+
+    const firebaseConfig = {
+    apiKey: "AIzaSyCX4vYmL8LIygOgmoE0B9c7FlL2vHJPJmM",
+    authDomain: "runtracker-f372e.firebaseapp.com",
+    projectId: "runtracker-f372e",
+    storageBucket: "runtracker-f372e.firebasestorage.app",
+    messagingSenderId: "144324009143",
+    appId: "1:144324009143:web:6cffe5b2192f6f9aee4132"
+  };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const provider = new GoogleAuthProvider();
+
+    const userEmailEl = document.getElementById("userEmail");
+    const signInBtn    = document.getElementById("signInBtn");
+    const signOutBtn   = document.getElementById("signOutBtn");
+
+    onAuthStateChanged(auth, user => {
+      if (user) {
+        userEmailEl.textContent = user.email;
+        signInBtn.style.display  = "none";
+        signOutBtn.style.display = "block";
+      } else {
+        userEmailEl.textContent = "Not signed in";
+        signInBtn.style.display  = "block";
+        signOutBtn.style.display = "none";
+      }
+    });
+
+    signInBtn.addEventListener("click", () => {
+      signInWithPopup(auth, provider).catch(console.error);
+    });
+
+    signOutBtn.addEventListener("click", () => {
+      signOut(auth).catch(console.error);
+    });
+  </script>
+</body>
+</html>
